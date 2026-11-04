@@ -1,0 +1,16 @@
+# Ánh xạ chữ trong Excel → chữ trong danh mục MPLIS (khớp CHÍNH XÁC option trên form).
+# So khớp bên trái không phân biệt hoa thường / khoảng trắng thừa.
+# "TODO" = chưa biết giá trị MPLIS → hồ sơ dùng giá trị này bị chặn chạy thật (BR-05).
+# Bản người dùng sửa được đặt ở %APPDATA%\NhapPhieuMPLIS\danh_muc.toml (ưu tiên hơn file này).
+
+[loai_nha]
+"Liền kề" = "TODO"
+
+[cap_nha]
+"III" = "TODO"
+
+[ket_cau]
+"Nhà khung bê tông cốt thép" = "TODO"
+
+[thoi_han]
+"Lâu dài" = "TODO"

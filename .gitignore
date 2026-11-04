@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+.pytest_cache/
+build/
+dist/
+installer/Output/
+*.spec
+# Không commit dữ liệu thật (họ tên, CCCD). Chỉ file đã ẩn danh trong tests/data.
+*.xlsx
+*.xlsm
+!tests/data/*_an_danh.xlsx
+# Trace/ảnh Playwright có thể chứa dữ liệu thật
+*.zip
+*.png
+!docs/**/*.png

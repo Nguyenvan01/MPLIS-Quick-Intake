@@ -1,0 +1,82 @@
+"""Quy tắc nghiệp vụ BR-01 … BR-08 (xem docs/nghiep-vu.md)."""
+from __future__ import annotations
+
+from pydantic import ValidationError
+
+from ..infra.excel_in import RawRow, ReadResult
+from .chuan_hoa import cccd_khop, to_cccd
+from .models import DongPhieu, NhaO, Nguoi, ThuaDat, VanDe
+
+NEN_CO = {  # BR-06: thiếu thì cảnh báo, không chặn
+    "ma_phat_hanh": "Mã phát hành",
+    "thoi_han": "Thời hạn sử dụng đất",
+    "mau_nha": "Mẫu nhà",
+    "phan_loai_duong": "Phân loại đường",
+    "can_bo": "Cán bộ XL",
+}
+
+
+def _loi_de_doc(err: ValidationError) -> str:
+    return "; ".join(f"{'.'.join(map(str, e['loc'])) or 'dòng'}: {e['msg']}" for e in err.errors())
+
+
+def _nguoi(v: dict, prefix: str, vai_tro: str, notes: list[tuple[str, str]]) -> Nguoi | None:
+    if not v.get(f"{prefix}_ho_ten"):
+        if any(v.get(f"{prefix}_{k}") for k in ("nam_sinh", "cccd", "dia_chi")):
+            raise ValueError(f"Cột {vai_tro} có CCCD/năm sinh/địa chỉ nhưng thiếu họ tên")
+        return None
+    cccd, cccd_notes = to_cccd(v.get(f"{prefix}_cccd"))
+    notes += [("BR-02", f"{vai_tro}: {n}") for n in cccd_notes]
+    n = Nguoi(vai_tro=vai_tro, ho_ten=v[f"{prefix}_ho_ten"], nam_sinh=v.get(f"{prefix}_nam_sinh"),
+              cccd=cccd, dia_chi=v.get(f"{prefix}_dia_chi"))
+    if n.cccd:
+        notes += [("BR-02", f"{vai_tro}: {x}") for x in cccd_khop(n.cccd, n.nam_sinh, vai_tro)]
+    return n
+
+
+def kiem_tra_dong(raw: RawRow) -> tuple[DongPhieu | None, list[VanDe]]:
+    v, r = raw.values, raw.excel_row
+    notes: list[tuple[str, str]] = []
+    try:
+        nguoi = tuple(x for x in (_nguoi(v, "ong", "Ông", notes), _nguoi(v, "ba", "Bà", notes)) if x)
+        if not nguoi:
+            return None, [VanDe(excel_row=r, muc="loi", ma="BR-01", noi_dung="Không có người nhận nào có họ tên")]
+        dong = DongPhieu(
+            excel_row=r, stt=v.get("stt"), ma_dau_vao=v.get("ma_dau_vao"),
+            ben_chuyen=v.get("ben_chuyen"), xac_nhan=v.get("xac_nhan"), nguoi=nguoi,
+            thua=ThuaDat(so_to=v.get("so_to"), so_thua=v.get("so_thua"), dien_tich=v.get("dien_tich"),
+                         ma_phat_hanh=v.get("ma_phat_hanh"), thoi_han=v.get("thoi_han"),
+                         dia_chi=v.get("dia_chi_thua")),
+            nha=NhaO(**{k: v.get(k) for k in NhaO.model_fields}),
+            mau_nha=v.get("mau_nha"), phan_loai_duong=v.get("phan_loai_duong"), can_bo=v.get("can_bo"),
+        )
+    except ValidationError as e:
+        return None, [VanDe(excel_row=r, muc="loi", ma="BR-03", noi_dung=_loi_de_doc(e))]
+    except ValueError as e:
+        return None, [VanDe(excel_row=r, muc="loi", ma="BR-02", noi_dung=str(e))]
+
+    issues = [VanDe(excel_row=r, muc="canh_bao", ma=ma, noi_dung=t) for ma, t in notes]
+    for field, label in NEN_CO.items():
+        val = getattr(dong.thua, field, None) if field in ("ma_phat_hanh", "thoi_han") else getattr(dong, field)
+        if val in (None, ""):
+            issues.append(VanDe(excel_row=r, muc="canh_bao", ma="BR-06", noi_dung=f"Thiếu {label}"))
+    return dong, issues
+
+
+def kiem_tra_file(result: ReadResult) -> tuple[list[DongPhieu], list[VanDe]]:
+    issues = [VanDe(excel_row=0, muc="canh_bao", ma="BR-08", noi_dung=w) for w in result.warnings]
+    rows: list[DongPhieu] = []
+    seen: dict[tuple[int, int], int] = {}
+    for raw in result.rows:
+        dong, row_issues = kiem_tra_dong(raw)
+        issues += row_issues
+        if dong is None:
+            continue
+        k = (dong.thua.so_to, dong.thua.so_thua)
+        if k in seen:  # BR-03
+            issues.append(VanDe(excel_row=raw.excel_row, muc="loi", ma="BR-03",
+                                noi_dung=f"Trùng tờ/thửa {k[0]}/{k[1]} với dòng {seen[k]} — bỏ qua"))
+            continue
+        seen[k] = raw.excel_row
+        rows.append(dong)
+    return rows, issues

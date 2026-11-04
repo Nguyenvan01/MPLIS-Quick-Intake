@@ -1,0 +1,70 @@
+# Locator cho MPLIS (hye.mplis.gov.vn). Lấy bằng:
+#   uv run playwright codegen --channel msedge https://hye.mplis.gov.vn
+# Quy ước và cách điền: docs/locators/README.md
+# "TODO" = chưa lấy. Code gọi tới locator TODO sẽ báo lỗi ChuaCoLocator, không đoán.
+# Ưu tiên: role > label > placeholder > text > test_id > css. Không dùng XPath dài.
+
+[login]
+o_tai_khoan   = { by = "label", text = "TODO" }
+o_mat_khau    = { by = "label", text = "TODO" }
+nut_dang_nhap = { by = "role", role = "button", name = "TODO" }
+da_dang_nhap  = { by = "text", text = "TODO" }   # thứ CHỈ thấy khi đã đăng nhập (vd tên người dùng, nút Đăng xuất)
+
+[them_moi_nhanh]
+mo_form         = { by = "role", role = "button", name = "TODO" }   # đường đi từ trang chủ tới form
+vung_form       = { by = "role", role = "dialog", name = "TODO" }   # bỏ dòng này nếu form không nằm trong hộp thoại
+nut_them_thua   = { by = "role", role = "button", name = "TODO" }   # chỉ cần khi gộp nhiều dòng/hồ sơ
+nut_them_nguoi  = { by = "role", role = "button", name = "TODO" }
+hop_thoai_nguoi = { by = "role", role = "dialog", name = "TODO" }
+nut_luu_nguoi   = { by = "role", role = "button", name = "TODO" }
+nut_luu         = { by = "role", role = "button", name = "TODO" }
+nut_huy         = { by = "role", role = "button", name = "TODO" }
+xac_nhan_huy    = { by = "role", role = "button", name = "TODO" }   # nếu bấm Hủy có hỏi lại
+thong_bao_ok    = { by = "text", text = "TODO", exact = false }      # thông báo sau khi lưu thành công
+ma_ho_so_moi    = { by = "css", value = "TODO" }                     # nơi hiện mã hồ sơ vừa tạo
+mau_ma_ho_so    = 'TODO'                                             # regex của mã hồ sơ, vd 'H\d{2}\.\d{2}-\d{6}-\d{4}'
+
+# Ô của thửa đất / nhà ở. Khóa trùng mapping.py. kind = text | select
+[them_moi_nhanh.truong]
+so_to          = { by = "label", text = "TODO" }
+so_thua        = { by = "label", text = "TODO" }
+dien_tich      = { by = "label", text = "TODO" }
+ma_phat_hanh   = { by = "label", text = "TODO" }
+thoi_han       = { by = "label", text = "TODO", kind = "select" }
+dia_chi_thua   = { by = "label", text = "TODO" }
+loai_nha       = { by = "label", text = "TODO", kind = "select" }
+cap_nha        = { by = "label", text = "TODO", kind = "select" }
+dt_xay_dung    = { by = "label", text = "TODO" }
+dt_san         = { by = "label", text = "TODO" }
+so_tang        = { by = "label", text = "TODO" }
+nam_hoan_cong  = { by = "label", text = "TODO" }
+ket_cau        = { by = "label", text = "TODO", kind = "select" }
+ma_dau_vao     = { by = "label", text = "TODO" }   # xóa nếu Mã đầu vào không nhập vào form
+
+# Ô trong hộp thoại thêm người nhận
+[them_moi_nhanh.nguoi]
+gioi_tinh = { by = "label", text = "TODO", kind = "select" }
+ho_ten    = { by = "label", text = "TODO" }
+nam_sinh  = { by = "label", text = "TODO" }
+cccd      = { by = "label", text = "TODO" }
+dia_chi   = { by = "label", text = "TODO" }
+
+[tra_cuu]
+mo_man_hinh    = { by = "role", role = "link", name = "TODO" }
+o_so_to        = { by = "label", text = "TODO" }
+o_so_thua      = { by = "label", text = "TODO" }
+o_cccd         = { by = "label", text = "TODO" }   # tùy chọn
+o_ma_ho_so_tim = { by = "label", text = "TODO" }
+nut_tim        = { by = "role", role = "button", name = "TODO" }
+dong_ket_qua   = { by = "css", value = "TODO" }    # các dòng trong bảng kết quả
+o_ma_ho_so     = { by = "css", value = "TODO" }    # ô mã hồ sơ, TƯƠNG ĐỐI trong một dòng kết quả
+
+# Ô đọc lại ở màn chi tiết để so khớp (BR-07). Khóa trùng port.gia_tri_so_khop().
+# read = "value" cho ô input, mặc định đọc chữ hiển thị.
+[tra_cuu.chi_tiet]
+so_to        = { by = "label", text = "TODO", read = "value" }
+so_thua      = { by = "label", text = "TODO", read = "value" }
+dien_tich    = { by = "label", text = "TODO", read = "value" }
+ma_phat_hanh = { by = "label", text = "TODO", read = "value" }
+cccd_ong     = { by = "css", value = "TODO" }
+cccd_ba      = { by = "css", value = "TODO" }
