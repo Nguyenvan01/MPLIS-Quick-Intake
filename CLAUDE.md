@@ -1,11 +1,11 @@
 # CLAUDE.md — hướng dẫn cho Claude Code
 
 Tool desktop Windows: đọc file Excel *Phiếu chuyển thông tin địa chính* và tạo mới hồ sơ tiếp nhận trên
-MPLIS (hye.mplis.gov.vn) bằng chức năng **Thêm mới nhanh**. Việc cần làm theo thứ tự nằm trong `plan.md`.
+MPLIS (hye.mplis.gov.vn) rồi chuyển quyền qua wizard (`docs/luong-thao-tac.md`). Việc cần làm theo thứ tự nằm trong `plan.md`.
 
 ## Đọc trước khi code
 - `plan.md` — giai đoạn, task, tiêu chí xong. Làm task theo thứ tự, tick `[x]` khi xong.
-- `docs/nghiep-vu.md` — quy tắc BR-01…BR-08. Code kiểm tra dữ liệu phải trích đúng mã BR.
+- `docs/nghiep-vu.md` — quy tắc BR-01…BR-09. Code kiểm tra dữ liệu phải trích đúng mã BR.
 - `docs/kien-truc.md` — 5 lớp, máy trạng thái, chống tạo trùng.
 - `docs/wireframe.md` — đặc tả 8 màn hình M1–M8.
 - `docs/locators/README.md` — locator do người dùng lấy; cách đọc bản ghi codegen.
@@ -16,8 +16,8 @@ uv sync --all-groups                 # cài
 uv run pytest -q                     # test (không cần mạng, không mở trình duyệt)
 uv run tiep-nhan kiem-tra tests/data/phieu_mau_an_danh.xlsx
 uv run tiep-nhan locator-todo        # còn locator nào chưa lấy
-uv run tiep-nhan kiem-locator --section login     # mở Edge thật
-uv run tiep-nhan chay-thu <file>     # mở Edge thật, điền form, KHÔNG lưu
+uv run tiep-nhan kiem-locator --section tiep_nhan     # mở Chromium thật
+uv run tiep-nhan chay-thu <file>     # mở Chromium thật, điền form, KHÔNG lưu
 uv run tiep-nhan gui
 ```
 

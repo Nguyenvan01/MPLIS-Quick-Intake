@@ -1,7 +1,7 @@
 # Thêm mới nhanh hồ sơ tiếp nhận MPLIS
 
 Đọc file Excel *Phiếu chuyển thông tin địa chính*, kiểm tra theo quy tắc nghiệp vụ, rồi tạo hồ sơ tiếp nhận
-trên MPLIS bằng Playwright + Microsoft Edge. Tra cứu lại từng hồ sơ trước khi ghi Thành công; chạy lại
+trên MPLIS bằng Playwright + Chromium. Tra cứu lại từng hồ sơ trước khi ghi Thành công; chạy lại
 không bao giờ tạo trùng.
 
 ```powershell

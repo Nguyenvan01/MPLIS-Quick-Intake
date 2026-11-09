@@ -1,70 +1,144 @@
 # Locator cho MPLIS (hye.mplis.gov.vn). Lấy bằng:
-#   uv run playwright codegen --channel msedge https://hye.mplis.gov.vn
+#   uv run playwright codegen https://hye.mplis.gov.vn
 # Quy ước và cách điền: docs/locators/README.md
 # "TODO" = chưa lấy. Code gọi tới locator TODO sẽ báo lỗi ChuaCoLocator, không đoán.
 # Ưu tiên: role > label > placeholder > text > test_id > css. Không dùng XPath dài.
 
-[login]
-o_tai_khoan   = { by = "label", text = "TODO" }
-o_mat_khau    = { by = "label", text = "TODO" }
-nut_dang_nhap = { by = "role", role = "button", name = "TODO" }
-da_dang_nhap  = { by = "text", text = "TODO" }   # thứ CHỈ thấy khi đã đăng nhập (vd tên người dùng, nút Đăng xuất)
-
-[them_moi_nhanh]
-mo_form         = { by = "role", role = "button", name = "TODO" }   # đường đi từ trang chủ tới form
-vung_form       = { by = "role", role = "dialog", name = "TODO" }   # bỏ dòng này nếu form không nằm trong hộp thoại
-nut_them_thua   = { by = "role", role = "button", name = "TODO" }   # chỉ cần khi gộp nhiều dòng/hồ sơ
-nut_them_nguoi  = { by = "role", role = "button", name = "TODO" }
-hop_thoai_nguoi = { by = "role", role = "dialog", name = "TODO" }
-nut_luu_nguoi   = { by = "role", role = "button", name = "TODO" }
-nut_luu         = { by = "role", role = "button", name = "TODO" }
-nut_huy         = { by = "role", role = "button", name = "TODO" }
-xac_nhan_huy    = { by = "role", role = "button", name = "TODO" }   # nếu bấm Hủy có hỏi lại
-thong_bao_ok    = { by = "text", text = "TODO", exact = false }      # thông báo sau khi lưu thành công
-ma_ho_so_moi    = { by = "css", value = "TODO" }                     # nơi hiện mã hồ sơ vừa tạo
-mau_ma_ho_so    = 'TODO'                                             # regex của mã hồ sơ, vd 'H\d{2}\.\d{2}-\d{6}-\d{4}'
-
-# Ô của thửa đất / nhà ở. Khóa trùng mapping.py. kind = text | select
-[them_moi_nhanh.truong]
-so_to          = { by = "label", text = "TODO" }
-so_thua        = { by = "label", text = "TODO" }
-dien_tich      = { by = "label", text = "TODO" }
-ma_phat_hanh   = { by = "label", text = "TODO" }
-thoi_han       = { by = "label", text = "TODO", kind = "select" }
-dia_chi_thua   = { by = "label", text = "TODO" }
-loai_nha       = { by = "label", text = "TODO", kind = "select" }
-cap_nha        = { by = "label", text = "TODO", kind = "select" }
-dt_xay_dung    = { by = "label", text = "TODO" }
-dt_san         = { by = "label", text = "TODO" }
-so_tang        = { by = "label", text = "TODO" }
-nam_hoan_cong  = { by = "label", text = "TODO" }
-ket_cau        = { by = "label", text = "TODO", kind = "select" }
-ma_dau_vao     = { by = "label", text = "TODO" }   # xóa nếu Mã đầu vào không nhập vào form
-
-# Ô trong hộp thoại thêm người nhận
-[them_moi_nhanh.nguoi]
-gioi_tinh = { by = "label", text = "TODO", kind = "select" }
-ho_ten    = { by = "label", text = "TODO" }
-nam_sinh  = { by = "label", text = "TODO" }
-cccd      = { by = "label", text = "TODO" }
-dia_chi   = { by = "label", text = "TODO" }
-
+# Màn "Tra cứu hồ sơ tiếp nhận", đã xác minh trên MPLIS ngày 08/11/2026.
 [tra_cuu]
-mo_man_hinh    = { by = "role", role = "link", name = "TODO" }
-o_so_to        = { by = "label", text = "TODO" }
-o_so_thua      = { by = "label", text = "TODO" }
-o_cccd         = { by = "label", text = "TODO" }   # tùy chọn
-o_ma_ho_so_tim = { by = "label", text = "TODO" }
-nut_tim        = { by = "role", role = "button", name = "TODO" }
-dong_ket_qua   = { by = "css", value = "TODO" }    # các dòng trong bảng kết quả
-o_ma_ho_so     = { by = "css", value = "TODO" }    # ô mã hồ sơ, TƯƠNG ĐỐI trong một dòng kết quả
+duong_dan        = "/dc/CungCapThongTinHoSoTiepNhan/V2"
+overlay          = { by = "css", value = ":text-matches(\"^Đang xử lý( dữ liệu)?\\\\.\\\\.\\\\.$\")" }   # không khớp nhãn "Trạng thái: Đang xử lý"
+select2_xa       = { by = "css", value = "#frmSearchHoSoTiepNhan select[name=xaId] ~ .select2 .select2-selection", nth = 0 }
+select2_tim      = { by = "css", value = ".select2-container--open .select2-search__field" }
+select2_lua_chon = { by = "css", value = ".select2-container--open .select2-results__option" }
+o_so_bien_nhan   = { by = "css", value = "#frmSearchHoSoTiepNhan [name=soBienNhan]", nth = 0 }
+o_so_thua        = { by = "css", value = "#frmSearchHoSoTiepNhan [name=soThua]", nth = 0 }
+o_so_to          = { by = "css", value = "#frmSearchHoSoTiepNhan [name=soTo]", nth = 0 }
+nut_tim          = { by = "css", value = "#btnTraCuuHoSoTiepNhan" }
 
-# Ô đọc lại ở màn chi tiết để so khớp (BR-07). Khóa trùng port.gia_tri_so_khop().
-# read = "value" cho ô input, mặc định đọc chữ hiển thị.
-[tra_cuu.chi_tiet]
-so_to        = { by = "label", text = "TODO", read = "value" }
-so_thua      = { by = "label", text = "TODO", read = "value" }
-dien_tich    = { by = "label", text = "TODO", read = "value" }
-ma_phat_hanh = { by = "label", text = "TODO", read = "value" }
-cccd_ong     = { by = "css", value = "TODO" }
-cccd_ba      = { by = "css", value = "TODO" }
+# Luồng thật /dc/TiepNhanHoSo, đã xác minh trên MPLIS ngày 08/11/2026.
+# Dùng css theo id vì nút trùng tên ("Chọn", "Đóng") và ô select2 không gắn nhãn.
+[tiep_nhan]
+duong_dan      = "/dc/TiepNhanHoSo"
+quy_trinh_tim  = "1.012787"
+quy_trinh_khop = "(từ 30 hồ"   # chữ trên MPLIS viết sai là "hồ sở" nên chỉ khớp phần đầu; về sau cho chọn trên giao diện
+buoc_chuyen    = "3. Thụ lý"
+lop_da_chon    = "selectUser"   # lớp MPLIS gắn vào dòng người xử lý đang chọn; bấm lại là bỏ chọn
+
+overlay          = { by = "css", value = ":text-matches(\"^Đang xử lý( dữ liệu)?\\\\.\\\\.\\\\.$\")" }   # không khớp nhãn "Trạng thái: Đang xử lý"
+hop              = { by = "css", value = ".jconfirm-box" }
+hop_noi_dung     = { by = "css", value = ".jconfirm-content" }
+hop_dong_y       = { by = "role", role = "button", name = "Đồng ý", exact = false }
+hop_khong        = { by = "role", role = "button", name = "Không", exact = false }
+nut_dong         = { by = "role", role = "button", name = "Đóng", exact = false }
+
+select2_xa       = { by = "css", value = "select[name=xaId] ~ .select2 .select2-selection", nth = 0 }
+select2_quy_trinh = { by = "css", value = "select[name=quytrinh] ~ .select2 .select2-selection" }
+select2_tim      = { by = "css", value = ".select2-container--open .select2-search__field" }
+select2_lua_chon = { by = "css", value = ".select2-container--open .select2-results__option" }
+
+nut_tim_thua     = { by = "css", value = "#btnOpenFormSearchThuaDat" }
+modal_tim_thua   = { by = "css", value = "#modalSearchThuaDat" }
+o_so_thua        = { by = "css", value = "[name=soThuTuThua]" }
+o_so_to          = { by = "css", value = "[name=soHieuToBanDo]" }
+nut_tra_thua     = { by = "css", value = "#btnTraCuuThuaDat" }
+dong_thua        = { by = "css", value = "#tblTraCuuThuaDat tbody tr" }
+nut_chon_thua    = { by = "css", value = "#btnLuuChonThuaDat" }
+o_dia_chi_ts     = { by = "css", value = "[name=diaChiTaiSan]", nth = 0 }
+
+nut_tim_nguoi    = { by = "css", value = "#openModalSearchNguoiNopDon" }
+modal_tim_nguoi  = { by = "css", value = "#modalSearchChuSoHuu" }
+o_so_giay_to     = { by = "css", value = "[name=soGiayTo]" }
+nut_tra_nguoi    = { by = "css", value = "#btnTraCuuCaNhan" }
+dong_nguoi       = { by = "css", value = "#tblTraCuuCaNhan tbody tr" }
+nut_chon_nguoi   = { by = "css", value = "#btnLuuChonCaNhan" }
+o_ten_nop        = { by = "css", value = "#hoTenNguoiNopHoSo" }
+o_giay_nop       = { by = "css", value = "[name=giayChungMinh]" }
+o_dia_chi_nop    = { by = "css", value = "[name=diachi]" }
+nhan_mot_cua     = { by = "css", value = "label[for=chkNhanHoSoMotCua]" }
+o_mot_cua        = { by = "css", value = "#chkNhanHoSoMotCua" }
+
+nut_luu          = { by = "css", value = "#btnSaveDKHoSo" }
+o_so_bien_nhan   = { by = "css", value = "[name=soBienNhan]", nth = 0 }
+
+popup_gcn        = { by = "css", value = "#mdlDanhSachGiayChungNhan" }
+dong_gcn         = { by = "css", value = "tbody tr" }
+o_chon_gcn       = { by = "css", value = "td.select-checkbox" }
+nut_chon_gcn     = { by = "css", value = "#btnCapNhatThanhPhanHoSo" }
+o_bang           = { by = "css", value = "td" }
+o_cot_2          = { by = "css", value = "td:nth-child(2)" }
+
+nut_xu_ly        = { by = "css", value = "a#btnXuLyHoSo" }
+modal_quy_trinh  = { by = "css", value = "#modalQuyTrinhXuLy" }
+o_da_xu_ly       = { by = "css", value = "tbody input[type=checkbox]" }
+nut_chuyen       = { by = "role", role = "button", name = "Chuyển phân công", exact = false }
+modal_chon_nguoi = { by = "css", value = "[id^=modalSelectUser]" }
+cbb_buoc         = { by = "css", value = "#cbbActivity, select[name=cbbActivity]", nth = 0 }
+dong_can_bo      = { by = "css", value = "tbody tr" }
+o_loc_can_bo     = { by = "placeholder", text = "Nhập tên cán bộ, tên user", exact = false }  # lấy từ ảnh hộp thoại người dùng gửi 09/11/2026
+tai_lai_can_bo   = { by = "text", text = "Tải lại danh sách tài khoản", exact = false }  # lấy từ ảnh hộp thoại người dùng gửi 09/11/2026
+nut_thuc_thi     = { by = "css", value = "#btnExecuteCommand" }
+
+# Wizard "Chuyển quyền trọn giấy", đã đi hết trên MPLIS ngày 08/11/2026 (trường hợp vợ chồng).
+[chuyen_quyen]
+so_ph_trung    = "đã được cấp phát"   # chữ trong thông báo CẢNH BÁO TRÙNG SỐ của MPLIS
+overlay        = { by = "css", value = ":text-matches(\"^Đang xử lý( dữ liệu)?\\\\.\\\\.\\\\.$\")" }
+hop            = { by = "css", value = ".jconfirm-box" }
+hop_dong_y     = { by = "role", role = "button", name = "Đồng ý", exact = false }
+nut_xu_ly      = { by = "css", value = "a#btnXuLyHoSo" }
+modal_quy_trinh = { by = "css", value = "#modalQuyTrinhXuLy" }
+dong_tac_vu    = { by = "css", value = "tbody tr" }
+wizard         = { by = "css", value = "#mdlRemoteForm" }
+buoc_hien      = { by = "css", value = "li.active a" }
+nut_buoc_sau   = { by = "role", role = "button", name = "Bước sau", exact = false }
+nut_hoan_tat   = { by = "css", value = "a:text-is(\"Hoàn tất\"), button:text-is(\"Hoàn tất\")" }
+menu_muc       = { by = "css", value = ".dropdown-menu a" }
+
+nut_them_chu   = { by = "css", value = "#btnThemChuSuDung" }
+modal_vo_chong = { by = "css", value = "[id^=mdlChiTietChuSuDung]" }
+nut_cong_nguoi = { by = "css", value = "a:has(i[class*=plus]), button:has(i[class*=plus])" }
+nut_luu_vo_chong = { by = "css", value = "[id^=btnSaveVoChong]" }
+# Form người: luồng vợ chồng nằm trong mdlCaNhanChiTiet, luồng cá nhân nằm trong mdlChiTietChuSuDung (đã đối chiếu trace)
+modal_ca_nhan  = { by = "css", value = "[id^=vModuleCaNhanChiTietV2]" }
+o_ho_ten       = { by = "css", value = "[name=hoTen]" }
+o_nam_sinh     = { by = "css", value = "[name=namSinh]" }
+o_gioi_tinh    = { by = "css", value = "[name=gioiTinh]" }
+o_so_giay_to   = { by = "css", value = "[name=soGiayTo]" }
+o_dia_chi      = { by = "css", value = "[name=diaChiChiTiet]" }
+nut_luu        = { by = "css", value = "a.btn:text-is(\"Lưu\"), button:text-is(\"Lưu\")" }
+
+neo_cay        = { by = "css", value = "a.jstree-anchor" }
+neo_chua_tick  = { by = "css", value = "a.jstree-anchor:not(.jstree-checked)" }
+o_tick_cay     = { by = "css", value = ".jstree-checkbox" }
+lk_xu_ly       = { by = "text", text = "Xử lý tác vụ" }
+nut_sua_ts     = { by = "css", value = "#btnSuaTaiSan" }
+nut_them_ts    = { by = "css", value = "#btnThemTaiSan" }
+modal_tai_san  = { by = "css", value = "[id^=mdlChiTietTaiSan]" }
+dong_mdsd      = { by = "css", value = ".string-wrapper:text-matches(\"^\\\\s*ODT\")" }
+o_thoi_han     = { by = "css", value = "[name=thoiHanSuDung]" }
+nut_luu_thua   = { by = "css", value = "[id^=btnSaveThuaDat]" }
+
+sel_loai_nha   = { by = "css", value = "select[name=loaiNhaRiengLeId] ~ .select2 .select2-selection" }
+sel_cap_nha    = { by = "css", value = "select[name=loaiCapNhaId] ~ .select2 .select2-selection" }
+sel_ket_cau    = { by = "css", value = "[id^=ddlKetCauNhaO] ~ .select2 .select2-selection" }
+select2_tim    = { by = "css", value = ".select2-container--open .select2-search__field" }
+select2_lua_chon = { by = "css", value = ".select2-container--open .select2-results__option" }
+o_so_nha       = { by = "css", value = "[name=soNha]" }
+o_dt_xay_dung  = { by = "css", value = "[name=dienTichXayDung]" }
+o_dt_su_dung   = { by = "css", value = "[name=dienTichSuDung]" }
+mo_dia_chi     = { by = "text", text = "Địa chỉ chi tiết:", exact = false }
+o_dia_chi_chinh = { by = "css", value = "[name=laDiaChiChinh]" }
+nut_luu_nha    = { by = "css", value = "[id^=btnSaveNhaRiengLe]" }
+
+o_quyen_su_dung = { by = "css", value = "[name=coQuyenSuDung]" }
+o_quyen_so_huu = { by = "css", value = "[name=coQuyenSoHuu]" }
+nut_luu_dang_ky = { by = "css", value = "#btnLuuDangKyThongTinDangKy" }
+
+tab_gcn        = { by = "css", value = "li.tour_kekhaidangky_step16 a" }
+nut_them_gcn   = { by = "css", value = "#btnThemGiayChungNhan" }
+modal_gcn      = { by = "css", value = "[id^=mdlGiayChungNhanChiTiet]" }
+o_so_phat_hanh = { by = "css", value = "[name=soPhatHanh]" }
+o_vpdk         = { by = "css", value = "#rdVPCap" }
+o_so_vao_so    = { by = "css", value = "[name=soVaoSo]" }
+o_nguoi_ky     = { by = "css", value = "[name=tenNguoiKy]" }
+nut_luu_gcn    = { by = "css", value = "#btnLuuChiTietGiayChungNhan" }

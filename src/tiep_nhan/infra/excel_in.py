@@ -55,7 +55,9 @@ COLUMN_MAP: dict[str, str] = {
     "mẫu nhà": "mau_nha",
     "phân loại đường": "phan_loai_duong",
     "cán bộ xl": "can_bo",
+    "người nộp": "nguoi_nop",
     "mã đầu vào": "ma_dau_vao",
+    "số hợp đồng": "ma_dau_vao",  # mẫu theo đợt không có Mã đầu vào
 }
 REQUIRED = {"stt", "so_thua", "so_to", "ma_dau_vao", "ong_ho_ten", "ba_ho_ten"}
 
@@ -115,6 +117,8 @@ def read_phieu(path: str | Path, sheet: str | None = None) -> ReadResult:
         if not label:
             continue
         group = GROUPS.get(upper) if upper != label else None
+        if not upper and label in PERSON_FIELDS:  # mẫu không ghi Ông/Bà: chồng/vợ xác định sau theo CCCD (BR-09)
+            group = "ba" if f"ong_{PERSON_FIELDS[label]}" in columns else "ong"
         if group and label in PERSON_FIELDS:
             key = f"{group}_{PERSON_FIELDS[label]}"
         else:
@@ -159,3 +163,7 @@ def read_phieu(path: str | Path, sheet: str | None = None) -> ReadResult:
         result.rows.append(RawRow(excel_row=r, values=values))
 
     return result
+
+
+def ten_sheet(path: str | Path) -> list[str]:
+    return load_workbook(path, read_only=True).sheetnames

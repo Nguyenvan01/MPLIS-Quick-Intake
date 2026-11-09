@@ -13,3 +13,12 @@ installer/Output/
 *.zip
 *.png
 !docs/**/*.png
+# Phiên đăng nhập MPLIS: ai có file này là vào được tài khoản
+auth.json
+# Bản ghi codegen có họ tên, CCCD thật: chỉ commit sau khi đã ẩn danh
+docs/locators/raw/*.py
+# Công cụ thu thập selector: dữ liệu ghi được có họ tên, hồ sơ thật
+/harvest/
+/harvest-test/
+/recorded/
+node_modules/

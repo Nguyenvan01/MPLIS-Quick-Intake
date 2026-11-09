@@ -2,25 +2,25 @@
 
   uv run python -m tiep_nhan kiem-tra <file.xlsx> [--gop ma_dau_vao]
   uv run python -m tiep_nhan locator-todo
-  uv run python -m tiep_nhan kiem-locator --section login         (mở Edge thật)
-  uv run python -m tiep_nhan chay-thu <file.xlsx>                  (mở Edge thật, KHÔNG lưu)
+  uv run python -m tiep_nhan kiem-locator --section tiep_nhan         (mở Chromium thật)
+  uv run python -m tiep_nhan chay-thu <file.xlsx>                  (mở Chromium thật, KHÔNG lưu)
   uv run python -m tiep_nhan gui
 """
 from __future__ import annotations
 
 import argparse
-import getpass
 import sys
 from pathlib import Path
 
 from .domain.danh_muc import DanhMuc
 from .domain.gom_ho_so import CheDoGom
-from .infra.config import config_file
+from .infra.config import Settings, config_file
 
 
 def _lo(args):
     from .core.batch import nap_lo
-    return nap_lo(Path(args.file), DanhMuc.doc(config_file("danh_muc.toml")), CheDoGom(args.gop))
+    return nap_lo(Path(args.file), DanhMuc.doc(config_file("danh_muc.toml")), CheDoGom(args.gop),
+                  mac_dinh={"can_bo": args.can_bo, "thoi_han": Settings.load().thoi_han_mac_dinh})
 
 
 def cmd_kiem_tra(args) -> int:
@@ -50,25 +50,18 @@ def _mplis():
     return s, PlaywrightMplis(s, Locators.doc(config_file("locators.toml")), DanhMuc.doc(config_file("danh_muc.toml")))
 
 
-def _creds(s):
-    from .infra import credentials
-    user = s.username or input("Tài khoản MPLIS: ")
-    return user, credentials.get_password(user) or getpass.getpass("Mật khẩu: ")
-
-
 def cmd_kiem_locator(args) -> int:
     s, m = _mplis()
     with m:
-        m.page.goto(s.mplis_url)
-        if args.section != "login":
-            m.dang_nhap(*_creds(s))
-            input(f"Mở tới màn hình của [{args.section}] trong Edge rồi nhấn Enter… ")
+        m.cho_dang_nhap()
+        input(f"Mở tới màn hình của [{args.section}] trong Chromium rồi nhấn Enter… ")
         for path, kq in m.kiem_section(args.section):
             print(f"{'✓' if kq == 'OK' else '✗'} {path}: {kq}")
     return 0
 
 
 def cmd_chay_thu(args) -> int:
+    from .core.batch import xuat_ket_qua
     from .core.runner import Runner, RunOptions
     from .core.state import StateStore
     from .infra.config import STATE_DB
@@ -76,11 +69,20 @@ def cmd_chay_thu(args) -> int:
     if lo.co_loi:
         print("File còn lỗi chặn — chạy 'kiem-tra' để xem.")
         return 1
+    ket_qua: dict[str, tuple[str, str, str]] = {}
+
+    def su_kien(k: str, st: str, note: str, ma: str) -> None:
+        print(f"{st:12} {k} {ma} {note}", flush=True)
+        ket_qua[k] = (st, note, ma)
+
     s, m = _mplis()
     with m:
-        m.dang_nhap(*_creds(s))
-        Runner(lo.ho_so, m, StateStore(STATE_DB), RunOptions(dry_run=True),
-               on_event=lambda k, st, note, ma: print(f"{st:12} {k} {ma} {note}")).run()
+        m.cho_dang_nhap()
+        Runner(lo.ho_so, m, StateStore(STATE_DB), RunOptions(dry_run=True), on_event=su_kien).run()
+    try:
+        print(f"Đã ghi kết quả: {xuat_ket_qua(lo, ket_qua)}")
+    except PermissionError:
+        print("Không ghi được file kết quả: hãy đóng file đó trong Excel rồi chạy lại.")
     return 0
 
 
@@ -93,9 +95,10 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(name)
         p.add_argument("file")
         p.add_argument("--gop", choices=[c.value for c in CheDoGom], default=CheDoGom.MOI_DONG.value)
+        p.add_argument("--can-bo", default="", help="Cán bộ XL cho các dòng Excel để trống")
     sub.add_parser("locator-todo")
     p = sub.add_parser("kiem-locator")
-    p.add_argument("--section", default="login")
+    p.add_argument("--section", default="tiep_nhan")
     sub.add_parser("gui")
     args = ap.parse_args(argv)
     match args.cmd:

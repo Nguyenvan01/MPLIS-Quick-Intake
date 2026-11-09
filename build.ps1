@@ -5,8 +5,12 @@ $ErrorActionPreference = "Stop"
 uv sync --locked --all-groups
 uv run pytest -q
 
+# Tải Chromium vào trong gói playwright để PyInstaller mang theo; máy dùng không cần cài trình duyệt.
+$env:PLAYWRIGHT_BROWSERS_PATH = "0"
+uv run playwright install chromium
+
 # --onedir: khởi động nhanh, ít bị antivirus báo nhầm.
-# --collect-all playwright: kèm driver Node của Playwright (KHÔNG kèm Chromium vì dùng Edge).
+# --collect-all playwright: kèm driver Node và Chromium vừa tải.
 uv run pyinstaller --noconfirm --clean --onedir --windowed `
   --name NhapPhieuMPLIS `
   --paths src `

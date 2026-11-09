@@ -6,12 +6,12 @@ Claude Code đọc bản ghi rồi điền file đó (plan.md, task 1.1).
 ## 1. Ghi 4 luồng bằng codegen
 
 ```powershell
-uv run playwright codegen --channel msedge https://hye.mplis.gov.vn
+uv run playwright codegen https://hye.mplis.gov.vn
 ```
 
 Mỗi luồng ghi một file, chép nội dung khung bên phải của Playwright Inspector vào `docs/locators/raw/`:
 
-| File | Làm tay trong Edge | Phủ các mục |
+| File | Làm tay trong Chromium | Phủ các mục |
 | --- | --- | --- |
 | `01_dang_nhap.py` | Đăng xuất (nếu cần) → đăng nhập | `[login]` |
 | `02_them_moi_nhanh.py` | Từ trang chủ mở form Thêm mới nhanh → click và gõ vào TỪNG ô cần điền (dùng dữ liệu giả) → thêm 1 người nhận → bấm Hủy. **Không bấm Lưu.** | `[them_moi_nhanh]`, `.truong`, `.nguoi` |

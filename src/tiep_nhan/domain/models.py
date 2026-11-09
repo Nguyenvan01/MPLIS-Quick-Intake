@@ -1,11 +1,12 @@
 """Mô hình miền (pydantic v2). Lớp này KHÔNG import gì từ mplis/, app/ hay Playwright."""
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .chuan_hoa import chuan_ma_phat_hanh, to_decimal, to_int
+from .chuan_hoa import chuan_ma_phat_hanh, chuan_ten, gioi_tinh_cccd, to_decimal, to_int
 
 
 class _Base(BaseModel):
@@ -15,7 +16,7 @@ class _Base(BaseModel):
 class Nguoi(_Base):
     vai_tro: Literal["Ông", "Bà"]
     ho_ten: str = Field(min_length=2)
-    nam_sinh: int | None = Field(default=None, ge=1900, le=2026)
+    nam_sinh: int | None = Field(default=None, ge=1900)
     cccd: str | None = Field(default=None, pattern=r"^\d{12}$")
     dia_chi: str | None = None
 
@@ -23,6 +24,13 @@ class Nguoi(_Base):
     @classmethod
     def _nam(cls, v):
         return to_int(v)
+
+    @property
+    def gioi_tinh(self) -> str:
+        """Theo CCCD; không có CCCD mới dùng cột Ông/Bà."""
+        if self.cccd:
+            return gioi_tinh_cccd(self.cccd)
+        return "Nam" if self.vai_tro == "Ông" else "Nữ"
 
 
 class ThuaDat(_Base):
@@ -55,7 +63,7 @@ class NhaO(_Base):
     dt_xay_dung: float | None = Field(default=None, gt=0)
     dt_san: float | None = Field(default=None, gt=0)
     so_tang: int | None = Field(default=None, ge=1, le=100)
-    nam_hoan_cong: int | None = Field(default=None, ge=1900, le=2026)
+    nam_hoan_cong: int | None = Field(default=None, ge=1900)  # Excel có thể ghi năm dự kiến
     ket_cau: str | None = None
 
     @field_validator("dt_xay_dung", "dt_san", mode="before")
@@ -82,6 +90,7 @@ class DongPhieu(_Base):
     mau_nha: str | None = None
     phan_loai_duong: str | None = None
     can_bo: str | None = None
+    nguoi_nop_excel: str | None = None  # họ tên trong cột Người nộp, là một trong các người nhận (BR-09)
 
     @field_validator("stt", mode="before")
     @classmethod
@@ -91,6 +100,28 @@ class DongPhieu(_Base):
     @property
     def khoa_dong(self) -> str:
         return f"{self.ma_dau_vao}|to{self.thua.so_to}|thua{self.thua.so_thua}"
+
+    @property
+    def la_vo_chong(self) -> bool:
+        return len(self.nguoi) == 2
+
+    @property
+    def chong_vo(self) -> tuple[Nguoi, Nguoi]:
+        """(chồng, vợ) theo giới tính, không theo cột. BR-09 đã bảo đảm có một Nam, một Nữ."""
+        a, b = self.nguoi
+        return (a, b) if a.gioi_tinh == "Nam" else (b, a)
+
+    @property
+    def so_nha(self) -> str:
+        """Số nhà ở đầu địa chỉ (TĐ18-107, ...); địa chỉ không có số thì lấy mã căn từ Số hợp đồng."""
+        dau = (self.thua.dia_chi or "").split(",")[0].strip()
+        return dau if re.search(r"\d", dau) else self.ma_dau_vao.split("/")[0]
+
+    @property
+    def nguoi_nop(self) -> Nguoi:
+        if self.nguoi_nop_excel:
+            return next(n for n in self.nguoi if chuan_ten(n.ho_ten) == chuan_ten(self.nguoi_nop_excel))
+        return self.chong_vo[0] if self.la_vo_chong else self.nguoi[0]
 
     @property
     def ten_chu(self) -> str:

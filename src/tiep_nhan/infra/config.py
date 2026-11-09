@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 APP_NAME = "NhapPhieuMPLIS"
@@ -39,7 +39,7 @@ def config_file(name: str) -> Path:
 LOG_DIR = sub_dir("logs")
 TRACE_DIR = sub_dir("traces")
 SHOT_DIR = sub_dir("screenshots")
-BROWSER_PROFILE = sub_dir("edge-profile")
+BROWSER_PROFILE = sub_dir("chromium-profile")
 STATE_DB = app_dir() / "trang_thai.sqlite3"
 SETTINGS_FILE = app_dir() / "settings.json"
 
@@ -54,6 +54,9 @@ class Settings:
     che_do_gom: str = "moi_dong"          # xem domain/gom_ho_so.py
     cho_chay_khi_canh_bao: bool = True
     tim_trung_truoc: bool = True
+    nguoi_ky: str = "Phạm Ngọc Trường"
+    ds_can_bo: list[str] = field(default_factory=lambda: ["ltmung.nnmt", "ndanh.tnmt"])  # combobox người xử lý
+    thoi_han_mac_dinh: str = "Lâu dài"    # dùng khi Excel không có cột/ô Thời hạn
 
     @classmethod
     def load(cls) -> "Settings":
