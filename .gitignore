@@ -22,3 +22,5 @@ docs/locators/raw/*.py
 /harvest-test/
 /recorded/
 node_modules/
+.DS_Store
+/giao-dien-cai-tien/
