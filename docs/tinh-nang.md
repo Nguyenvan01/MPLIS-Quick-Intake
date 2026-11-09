@@ -2,7 +2,7 @@
 
 | ID | Nhóm | Tính năng | Ưu tiên | Màn hình |
 | --- | --- | --- | --- | --- |
-| F01 | Tài khoản | Đăng nhập MPLIS, nhớ mật khẩu trong Credential Manager, giữ phiên Edge | MVP | M1 |
+| F01 | Tài khoản | Đăng nhập MPLIS, nhớ mật khẩu trong Credential Manager, giữ phiên Chromium | MVP | M1 |
 | F02 | Đầu vào | Chọn file và sheet, nhận diện cột theo tên tiêu đề | MVP | M2 |
 | F03 | Đầu vào | Kiểm tra BR-01…BR-08, phân lỗi chặn / cảnh báo theo dòng | MVP | M3 |
 | F04 | Đầu vào | Ánh xạ danh mục Excel → MPLIS, lưu cho lần sau | MVP | M4 |

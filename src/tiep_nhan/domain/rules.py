@@ -1,10 +1,10 @@
-"""Quy tắc nghiệp vụ BR-01 … BR-08 (xem docs/nghiep-vu.md)."""
+"""Quy tắc nghiệp vụ BR-01 … BR-09 (xem docs/nghiep-vu.md)."""
 from __future__ import annotations
 
 from pydantic import ValidationError
 
 from ..infra.excel_in import RawRow, ReadResult
-from .chuan_hoa import cccd_khop, to_cccd
+from .chuan_hoa import chuan_ten, cccd_khop, to_cccd
 from .models import DongPhieu, NhaO, Nguoi, ThuaDat, VanDe
 
 NEN_CO = {  # BR-06: thiếu thì cảnh báo, không chặn
@@ -49,6 +49,7 @@ def kiem_tra_dong(raw: RawRow) -> tuple[DongPhieu | None, list[VanDe]]:
                          dia_chi=v.get("dia_chi_thua")),
             nha=NhaO(**{k: v.get(k) for k in NhaO.model_fields}),
             mau_nha=v.get("mau_nha"), phan_loai_duong=v.get("phan_loai_duong"), can_bo=v.get("can_bo"),
+            nguoi_nop_excel=v.get("nguoi_nop"),
         )
     except ValidationError as e:
         return None, [VanDe(excel_row=r, muc="loi", ma="BR-03", noi_dung=_loi_de_doc(e))]
@@ -60,6 +61,13 @@ def kiem_tra_dong(raw: RawRow) -> tuple[DongPhieu | None, list[VanDe]]:
         val = getattr(dong.thua, field, None) if field in ("ma_phat_hanh", "thoi_han") else getattr(dong, field)
         if val in (None, ""):
             issues.append(VanDe(excel_row=r, muc="canh_bao", ma="BR-06", noi_dung=f"Thiếu {label}"))
+    if dong.nguoi_nop_excel and chuan_ten(dong.nguoi_nop_excel) not in {chuan_ten(n.ho_ten) for n in dong.nguoi}:
+        issues.append(VanDe(excel_row=r, muc="loi", ma="BR-09", noi_dung="Cột Người nộp không khớp người nhận nào của dòng"))
+        return None, issues
+    if dong.la_vo_chong and dong.nguoi[0].gioi_tinh == dong.nguoi[1].gioi_tinh:
+        issues.append(VanDe(excel_row=r, muc="loi", ma="BR-09",
+                            noi_dung=f"Hai người nhận đều là {dong.nguoi[0].gioi_tinh}, không xác định được vợ/chồng"))
+        return None, issues
     return dong, issues
 
 
@@ -67,6 +75,7 @@ def kiem_tra_file(result: ReadResult) -> tuple[list[DongPhieu], list[VanDe]]:
     issues = [VanDe(excel_row=0, muc="canh_bao", ma="BR-08", noi_dung=w) for w in result.warnings]
     rows: list[DongPhieu] = []
     seen: dict[tuple[int, int], int] = {}
+    seen_ph: dict[str, int] = {}
     for raw in result.rows:
         dong, row_issues = kiem_tra_dong(raw)
         issues += row_issues
@@ -77,6 +86,13 @@ def kiem_tra_file(result: ReadResult) -> tuple[list[DongPhieu], list[VanDe]]:
             issues.append(VanDe(excel_row=raw.excel_row, muc="loi", ma="BR-03",
                                 noi_dung=f"Trùng tờ/thửa {k[0]}/{k[1]} với dòng {seen[k]} — bỏ qua"))
             continue
+        ph = dong.thua.ma_phat_hanh
+        if ph and ph in seen_ph:  # BR-03
+            issues.append(VanDe(excel_row=raw.excel_row, muc="loi", ma="BR-03",
+                                noi_dung=f"Trùng số phát hành {ph} với dòng {seen_ph[ph]} — bỏ qua"))
+            continue
         seen[k] = raw.excel_row
+        if ph:
+            seen_ph[ph] = raw.excel_row
         rows.append(dong)
     return rows, issues

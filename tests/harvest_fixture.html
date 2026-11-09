@@ -1,0 +1,22 @@
+<!doctype html><meta charset="utf-8"><title>Trang giả lập</title>
+<button id="them" onclick="menu.style.display='block'">Thêm</button>
+<ul id="menu" class="dropdown-menu" style="display:none">
+  <li>Cá nhân</li><li>Vợ chồng</li><li>Hộ gia đình</li><li>Tổ chức</li><li>Cộng đồng</li>
+</ul>
+<button id="mo" onclick="modalCaNhan.style.display='block'">Mở form</button>
+<div id="modalCaNhan" class="modal" style="display:none">
+  <h4 class="modal-title">Thêm cá nhân</h4>
+  <label for="soGiayTo">Số giấy tờ</label><input id="soGiayTo" name="soGiayTo">
+  <label for="mk">Mật khẩu</label><input id="mk" type="password">
+  <button id="luu" onclick="luuForm()">Lưu hồ sơ</button>
+  <button id="dong" onclick="modalCaNhan.style.display='none'">Đóng</button>
+</div>
+<div id="dangTai" style="display:none">Đang xử lý...</div>
+<iframe id="khung" srcdoc="<button id='trongKhung'>Trong khung</button>"></iframe>
+<script>
+async function luuForm() {
+  dangTai.style.display = 'block';
+  await fetch('/api/tim?token=bimat1', { method: 'POST', body: 'cccd=' + soGiayTo.value + '&password=hunter2' });
+  setTimeout(() => { dangTai.style.display = 'none'; }, 300);
+}
+</script>

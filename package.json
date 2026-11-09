@@ -1,0 +1,13 @@
+{
+  "name": "mplis-harvest",
+  "private": true,
+  "scripts": {
+    "login": "node login.js",
+    "harvest": "node harvest.js",
+    "dieu-khien": "node dieu_khien.js",
+    "test:harvest": "node --test tests/harvest.test.js tests/dieu_khien.test.js"
+  },
+  "devDependencies": {
+    "playwright": "1.62.0"
+  }
+}

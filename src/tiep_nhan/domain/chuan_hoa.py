@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 
@@ -48,17 +49,22 @@ def to_cccd(value: Any) -> tuple[str | None, list[str]]:
     if isinstance(value, (int, float)):
         value = str(int(value)).zfill(12)
         notes.append("CCCD đang lưu dạng số trong Excel (dễ mất số 0 đầu) — đã tự bù cho đủ 12 số")
-    s = re.sub(r"[\s.\-]", "", str(value))
+    s = re.sub(r"^cc:", "", re.sub(r"[\s.\-]", "", str(value)), flags=re.IGNORECASE)  # vài file ghi "CC: 0123…"
     if not re.fullmatch(r"\d{12}", s):
         raise ValueError(f"CCCD '{value}' không đủ 12 chữ số")
     return s, notes
+
+
+def gioi_tinh_cccd(cccd: str) -> str:
+    """Chữ số thứ 4 của CCCD: chẵn là Nam, lẻ là Nữ, ở mọi thế kỷ."""
+    return "Nam" if int(cccd[3]) % 2 == 0 else "Nữ"
 
 
 def cccd_khop(cccd: str, nam_sinh: int | None, vai_tro: str) -> list[str]:
     """Đối chiếu chữ số thứ 4 (giới tính + thế kỷ) và số 5–6 (năm sinh) của CCCD."""
     notes: list[str] = []
     code, yy = int(cccd[3]), int(cccd[4:6])
-    gioi = "Nam" if code % 2 == 0 else "Nữ"
+    gioi = gioi_tinh_cccd(cccd)
     nam = 1900 + 100 * (code // 2) + yy
     if vai_tro == "Ông" and gioi != "Nam":
         notes.append(f"CCCD {cccd[:4]}… là của Nữ nhưng nằm ở cột Ông")
@@ -67,6 +73,20 @@ def cccd_khop(cccd: str, nam_sinh: int | None, vai_tro: str) -> list[str]:
     if nam_sinh and nam_sinh != nam:
         notes.append(f"Năm sinh {nam_sinh} khác năm trong CCCD ({nam})")
     return notes
+
+
+def ten_xa(dia_chi: str | None) -> str | None:
+    """'AD18-19, Khu đô thị Đại An, Xã Nghĩa Trụ' -> 'Nghĩa Trụ'. Ghi nhiều xã nối bằng '+' thì lấy xã đầu. Không có thì None."""
+    m = re.search(r"(?:^|,)\s*(?:xã|phường|thị trấn)\s+([^,+]+)", dia_chi or "", re.IGNORECASE)
+    return m.group(1).strip() if m else None
+
+
+def chuan_ten(s: str) -> str:
+    return " ".join(unicodedata.normalize("NFC", s).lower().split())
+
+
+def nhieu_xa(dia_chi: str | None) -> bool:
+    return bool(re.search(r"\+\s*(?:xã|phường|thị trấn)\s", dia_chi or "", re.IGNORECASE))
 
 
 def chuan_ma_phat_hanh(value: Any) -> str | None:
