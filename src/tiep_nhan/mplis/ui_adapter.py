@@ -281,6 +281,9 @@ class PlaywrightMplis:
         self.wizard.url_ho_so = self.form.url_ho_so
         self.wizard.mo_du_thao()
 
+    def luu_du_thao(self, hs: HoSo, ma_ho_so: str) -> None:
+        self.wizard.luu_du_thao()
+
     def doc(self, hs: HoSo, ma_ho_so: str) -> dict[str, str]:
         if self.settings.chay_giao_dien:
             return self.tra_cuu.doc(hs, ma_ho_so)

@@ -36,7 +36,8 @@ class MplisPort(Protocol):
     def chuyen_xu_ly(self, hs: HoSo, ma_ho_so: str) -> str: ...  # trả tài khoản đã nhận; đánh dấu đã xử lý, chuyển Cán bộ XL
     def dien_chuyen_quyen(self, hs: HoSo, ma_ho_so: str) -> None: ...  # wizard đến Bước 4, chưa Hoàn tất
     def hoan_tat(self, hs: HoSo, ma_ho_so: str) -> None: ...
-    def mo_du_thao(self, hs: HoSo, ma_ho_so: str) -> None: ...  # mở màn "Dự thảo giấy chứng nhận", KHÔNG bấm Lưu dự thảo
+    def mo_du_thao(self, hs: HoSo, ma_ho_so: str) -> None: ...  # mở màn "Dự thảo giấy chứng nhận"
+    def luu_du_thao(self, hs: HoSo, ma_ho_so: str) -> None: ...  # trên màn dự thảo đang mở: Tạo QR mới rồi Lưu dự thảo
     def doc(self, hs: HoSo, ma_ho_so: str) -> dict[str, str]: ...        # đọc lại hồ sơ để so khớp
     def ve_trang_dau(self) -> None: ...
     def trace_start(self, key: str) -> None: ...

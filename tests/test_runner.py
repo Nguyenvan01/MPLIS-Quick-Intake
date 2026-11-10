@@ -81,7 +81,7 @@ def test_lech_khi_tra_cuu_lai(ho_so, store):
 def test_sau_luu_chon_gcn_roi_chuyen_xu_ly(ho_so, store):
     port = FakeMplis()
     run(ho_so[:1], port, store)
-    assert port.goi == ["luu", "chon_gcn", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "mo_du_thao"]
+    assert port.goi == ["luu", "chon_gcn", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "mo_du_thao", "luu_du_thao"]
     assert store.get(ho_so[0].key).trang_thai is TrangThai.THANH_CONG
 
 
@@ -95,7 +95,7 @@ def test_ngat_sau_luu_van_chon_gcn_mot_lan(ho_so, store):
     port = FakeMplis(ngat_sau_luu={ho_so[0].key})
     run(ho_so[:1], port, store)
     run(ho_so[:1], port, store)
-    assert port.goi == ["luu", "chon_gcn", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "mo_du_thao"]
+    assert port.goi == ["luu", "chon_gcn", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "mo_du_thao", "luu_du_thao"]
 
 
 def test_loi_khi_chon_gcn_chay_lai_khong_tao_ho_so_moi(ho_so, store):
@@ -104,7 +104,7 @@ def test_loi_khi_chon_gcn_chay_lai_khong_tao_ho_so_moi(ho_so, store):
     bg = store.get(ho_so[0].key)
     assert bg.trang_thai is TrangThai.DA_LUU and bg.ma_ho_so
     run(ho_so[:1], port, store)
-    assert port.goi == ["luu", "chon_gcn", "chon_gcn", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "mo_du_thao"]
+    assert port.goi == ["luu", "chon_gcn", "chon_gcn", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "mo_du_thao", "luu_du_thao"]
     assert store.get(ho_so[0].key).trang_thai is TrangThai.THANH_CONG
 
 
@@ -113,7 +113,7 @@ def test_loi_khi_chuyen_khong_chon_gcn_lan_hai(ho_so, store):
     run(ho_so[:1], port, store)
     assert store.get(ho_so[0].key).trang_thai is TrangThai.DA_CHON_GCN
     run(ho_so[:1], port, store)
-    assert port.goi == ["luu", "chon_gcn", "chuyen_xu_ly", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "mo_du_thao"]
+    assert port.goi == ["luu", "chon_gcn", "chuyen_xu_ly", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "mo_du_thao", "luu_du_thao"]
     assert store.get(ho_so[0].key).trang_thai is TrangThai.THANH_CONG
 
 
@@ -148,6 +148,19 @@ def test_loi_khi_mo_du_thao_van_thanh_cong_co_ghi_chu(ho_so, store):
     assert bg.trang_thai is TrangThai.THANH_CONG and "Dự thảo" in bg.ghi_chu
 
 
+def test_loi_khi_mo_du_thao_thi_khong_luu_du_thao(ho_so, store):
+    port = FakeMplis(loi_du_thao={ho_so[0].key})
+    run(ho_so[:1], port, store)
+    assert "luu_du_thao" not in port.goi
+
+
+def test_loi_khi_luu_du_thao_van_thanh_cong_co_ghi_chu(ho_so, store):
+    port = FakeMplis(loi_luu_du_thao={ho_so[0].key})
+    run(ho_so[:1], port, store)
+    bg = store.get(ho_so[0].key)
+    assert bg.trang_thai is TrangThai.THANH_CONG and "Lưu dự thảo" in bg.ghi_chu
+
+
 def test_loi_hoan_tat_khong_mo_du_thao(ho_so, store):
     port = FakeMplis(loi_hoan_tat={ho_so[0].key})
     run(ho_so[:1], port, store)
@@ -167,7 +180,7 @@ def test_chuyen_xong_chay_lai_chi_lam_wizard(ho_so, store):
     port = FakeMplis(da_co={"HS-9": {}})
     port.doc = lambda hs, ma: __import__("tiep_nhan.mplis.port", fromlist=["gia_tri_so_khop"]).gia_tri_so_khop(hs)
     run(ho_so[:1], port, store)
-    assert port.goi == ["dien_chuyen_quyen", "hoan_tat", "mo_du_thao"]
+    assert port.goi == ["dien_chuyen_quyen", "hoan_tat", "mo_du_thao", "luu_du_thao"]
     assert store.get(ho_so[0].key).trang_thai is TrangThai.THANH_CONG
 
 
@@ -241,7 +254,7 @@ def test_ghi_thoi_gian_tung_buoc(ho_so, store):
     logger.remove(h)
     tg = [x for x in dong if x.startswith("Thời gian")]
     assert len(tg) == 1 and ho_so[0].key in tg[0]
-    assert all(b in tg[0] for b in ("mo_form", "dien", "luu", "chon_gcn", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "mo_du_thao", "doc"))
+    assert all(b in tg[0] for b in ("mo_form", "dien", "luu", "chon_gcn", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "mo_du_thao", "luu_du_thao", "doc"))
 
 
 def _voi_so(hs, so):

@@ -27,6 +27,7 @@ class FakeMplis:
     so_moi_nhan: list[str] = field(default_factory=list)
     loi_hoan_tat: set[str] = field(default_factory=set)              # key hồ sơ lỗi khi Hoàn tất
     loi_du_thao: set[str] = field(default_factory=set)               # key hồ sơ lỗi khi mở Dự thảo GCN
+    loi_luu_du_thao: set[str] = field(default_factory=set)           # key hồ sơ lỗi khi tạo QR / Lưu dự thảo
     mo_lai: list[str] = field(default_factory=list)                  # các hồ sơ được mở lại khi chạy lại
     goi: list[str] = field(default_factory=list)                     # thứ tự các thao tác ghi
     so_da_cap_san: set[str] = field(default_factory=set)             # số phát hành MPLIS coi là đã cấp
@@ -130,6 +131,11 @@ class FakeMplis:
         self.goi.append("mo_du_thao")
         if hs.key in self.loi_du_thao:
             raise RuntimeError("lỗi giả lập khi mở Dự thảo")
+
+    def luu_du_thao(self, hs: HoSo, ma_ho_so: str) -> None:
+        self.goi.append("luu_du_thao")
+        if hs.key in self.loi_luu_du_thao:
+            raise RuntimeError("lỗi giả lập khi Lưu dự thảo")
 
     def doc(self, hs: HoSo, ma_ho_so: str) -> dict[str, str]:
         return {k: v for k, v in self.da_co[ma_ho_so].items() if not k.startswith("_")}
