@@ -194,7 +194,9 @@ class Runner:
             self.port.trace_stop(hs.key, keep=False)
         except Exception as e:  # noqa: BLE001 — một hồ sơ lỗi không làm dừng cả lô
             trace = self.port.trace_stop(hs.key, keep=True)
-            msg = che_so_trong_chu(f"{type(e).__name__}: {str(e).splitlines()[0][:200] if str(e) else ''}")
+            dong = str(e).splitlines()[0][:200] if str(e) else ""
+            # RuntimeError là lý do tool/MPLIS viết sẵn bằng tiếng Việt: không kèm tên lớp; lỗi khác giữ tên để dễ tra
+            msg = che_so_trong_chu(dong if isinstance(e, RuntimeError) and dong else f"{type(e).__name__}: {dong}")
             if not self.opts.dry_run and self.store.get(hs.key).trang_thai not in (TrangThai.DANG_TAO, TrangThai.CAN_KIEM_TRA, *MOC_SAU_LUU):
                 self.store.mark(hs.key, TrangThai.LOI, msg)
             logger.exception(f"{hs.key}: lỗi (trace: {trace})")  # không ghi họ tên ra log

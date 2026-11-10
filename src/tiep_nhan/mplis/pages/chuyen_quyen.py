@@ -151,8 +151,15 @@ class ChuyenQuyenPage(TiepNhanPage):
         nam = self._o("o_gioi_tinh", f)
         if nam.is_checked() != (n.gioi_tinh == "Nam"):
             nam.click()
-        self._o("nut_luu", f).click()
-        self._dong_y_neu_trung_giay_to()
+        # MPLIS kiểm CCCD ngay khi Lưu; chỉ khi đã có trong danh bạ mới hiện hộp "Giấy tờ tùy thân đã tồn tại" nên chỉ chờ hộp khi đó
+        try:
+            with self.page.expect_response(lambda r: "CheckCaNhanIsExist" in r.url, timeout=15_000) as tl:
+                self._o("nut_luu", f).click()
+            ton_tai = (tl.value.json().get("Value") or {}).get("IsExist")
+        except PwTimeout:
+            ton_tai = True  # không thấy lệnh kiểm (vd không có CCCD): chờ hộp như cũ
+        if ton_tai:
+            self._dong_y_neu_trung_giay_to()
         expect(self._hien("modal_ca_nhan")).to_have_count(0)
         self._khong_co_hop("lưu người nhận")
 

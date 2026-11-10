@@ -31,13 +31,13 @@ from ..domain.chuan_hoa import chuan_ma_phat_hanh, so_phat_hanh_hop_le
 from ..domain.danh_muc import DanhMuc
 from ..domain.gom_ho_so import CheDoGom
 from ..domain.models import HoSo
-from ..infra.config import BROWSER_PROFILE, LOG_DIR, STATE_DB, TRACE_DIR, Settings, app_dir, config_file
+from ..infra.config import BROWSER_PROFILE, LOG_DIR, STATE_DB, TRACE_DIR, Settings, app_dir, assets_dir, config_file
 from ..infra.excel_in import ten_sheet
 from ..infra.logging import che_cccd
 from ..mplis.locators import Locators
 from ..mplis.port import MplisPort
 from ..mplis.ui_adapter import PlaywrightMplis
-from .giao_dien import (CAM, CHE_DO, CO_TIEU_DE_MAN, LIEN_KET, _font_tieu_de, CHU, CHU_LOI, CHU_MO, CHU_NHAN, CHU_PHU, TRANG, NEN_APP, NEN_BAO_LOI, NEN_DANG_CHAY, NEN_KEO, NEN_THE, NEN_XU_LY_TAY, NHAN,
+from .giao_dien import (CAM, CHE_DO, CO_CHU, CO_NHO, CO_TIEU_DE_MAN, _font, LIEN_KET, _font_tieu_de, CHU, CHU_LOI, CHU_MO, CHU_NHAN, CHU_PHU, TRANG, NEN_APP, NEN_BAO_LOI, NEN_DANG_CHAY, NEN_KEO, NEN_XU_LY_TAY, NHAN,
                         TRANG_THAI, VAI_PHU, VIEN, VIEN_BAO_LOI, VIEN_KEO, VIEN_XU_LY_TAY, ChipLoc, DelegateDong, DelegateHaiDong, DelegateKetQua,
                         DelegateO, DelegateTrangThai, HangSo, NhanRutGon, NhanTrangThai, NutChinh, NutChu, NutNguyHiem, NutPhu, O_TimKiem, The,
                         TheChiSo, bo_dau, che_so_giay_to, dat_thuoc_tinh, dat_tien_do, doan_ket_qua, font_so, hang_nut, hop_nhap, hop_thong_bao,
@@ -293,6 +293,9 @@ class ManLoMoi(ManHinh):
         self.nut_chon.clicked.connect(self._chon)
         self.nut_khac = NutPhu("Chọn file khác…")
         self.nut_khac.clicked.connect(self._chon)
+        self.nut_mau = NutChu("Tải file mẫu")
+        self.nut_mau.setToolTip("File Excel đủ các cột tool đọc, kèm 2 dòng ví dụ và sheet hướng dẫn")
+        self.nut_mau.clicked.connect(self._tai_mau)
         self.trang = QStackedWidget()
         self.trang.addWidget(self._trang_chua_co())
         self.trang.addWidget(self._trang_co_file())
@@ -362,6 +365,7 @@ class ManLoMoi(ManHinh):
         lay.addWidget(_chu_phu("hoặc"))
         lay.addWidget(self.nut_chon)
         lay.addStretch(1)
+        lay.addWidget(self.nut_mau)
         return w
 
     def _trang_co_file(self) -> QWidget:
@@ -489,6 +493,17 @@ class ManLoMoi(ManHinh):
         self.vung.dat(vien=VIEN_KEO, dut=True)
         self.mo_file(self._hop_le(e)[0])
 
+    def _tai_mau(self) -> None:
+        f, _ = QFileDialog.getSaveFileName(self, "Lưu file mẫu", str(Path.home() / "Downloads" / "phieu_chuyen_mau.xlsx"), "Excel (*.xlsx)")
+        if not f:
+            return
+        try:
+            shutil.copyfile(assets_dir() / "mau" / "phieu_chuyen_mau.xlsx", f)
+        except PermissionError:
+            hop_thong_bao(self, "Không lưu được", "Hãy đóng file đó trong Excel rồi lưu lại.", "canh_bao")
+            return
+        hop_thong_bao(self, "Đã lưu file mẫu", f"{f}\n\nĐiền dữ liệu thật thay 2 dòng ví dụ (tờ 999), rồi chọn file này ở màn Lô mới.")
+
     def _chon(self) -> None:
         cu = QSettings("NhapPhieuMPLIS", "giao_dien")
         f, _ = QFileDialog.getOpenFileName(self, "Chọn file Excel", str(cu.value("thu_muc_mo", "")), "Excel (*.xlsx *.xlsm)")
@@ -607,6 +622,7 @@ class ManKiemTra(ManHinh):
         self.cay.itemClicked.connect(self._chon_ma)
         self.xem = QTextBrowser()
         self.xem.setOpenLinks(False)
+        self.xem.setFont(_font(CO_NHO))
         cot_trai = QVBoxLayout()
         cot_trai.setSpacing(0)
         cot_trai.addWidget(The(self.bang, dem=8), 3)
@@ -761,8 +777,8 @@ class ManKiemTra(ManHinh):
         dt = str(d.thua.dien_tich).replace(".", ",") + " m²" if d.thua.dien_tich else chua_co
         hang = [("Địa chỉ", e(d.thua.dia_chi or "") or chua_co), ("Diện tích", dt), ("Số phát hành", e(d.thua.ma_phat_hanh or "") or chua_co),
                 ("Cán bộ XL", e(d.can_bo or "") or chua_co), ("Người nộp", e(d.nguoi_nop.ho_ten))]
-        o = "".join(f'<tr><td width="110" style="color:{CHU_PHU};padding:3px 0">{a}</td><td style="padding:3px 0">{b}</td></tr>' for a, b in hang)
-        nhan = f'<div style="color:{CHU_NHAN};font-size:12px;font-weight:600;margin-top:14px">%s</div>'
+        o = "".join(f'<tr><td width="90" style="color:{CHU_PHU};padding:2px 0">{a}</td><td style="padding:2px 0">{b}</td></tr>' for a, b in hang)
+        nhan = f'<div style="color:{CHU_NHAN};font-size:{CO_NHO}px;font-weight:600;margin-top:10px">%s</div>'
         nguoi = "".join(f'<div style="margin-top:4px"><b>{e(n.ho_ten)}</b> · Sinh {n.nam_sinh or "—"} · CCCD {che_cccd(n.cccd)}</div>' for n in d.nguoi)
         gop: dict[tuple[str, str], list[str]] = {}
         for v in self.van_de_theo_khoa.get(khoa, []):
@@ -773,7 +789,7 @@ class ManKiemTra(ManHinh):
             lan = f" · {len(ds)} lần" if len(ds) > 1 else ""
             vd += f'<div style="margin-top:6px"><b style="color:{mau}">{e(ma)}</b> {e("; ".join(dict.fromkeys(ds)))}{lan}</div>'
         self.xem.setHtml(f'<div style="color:{CHU_PHU};font-size:12px">Dòng {d.excel_row} trong Excel</div>'
-                         f'<div style="font-size:18px;font-weight:500">Tờ {d.thua.so_to}, thửa {d.thua.so_thua}</div>'
+                         f'<div style="font-size:{CO_CHU}px;font-weight:600">Tờ {d.thua.so_to}, thửa {d.thua.so_thua}</div>'
                          f'<table cellspacing="0" style="margin-top:8px">{o}</table>'
                          f'{nhan % "NGƯỜI NHẬN"}{nguoi}' + (f'{nhan % "VẤN ĐỀ CỦA HỒ SƠ NÀY"}{vd}' if vd else ""))
 
@@ -947,6 +963,7 @@ class _TheCheDo(The):
     def __init__(self, nut: QRadioButton, che_do: str, mo_ta: str):
         self.nut, self.cd = nut, CHE_DO[che_do]
         nut.setStyleSheet(f"QRadioButton {{ color: {self.cd['chu']}; font-size: 18px; font-weight: 500; }}")
+        nut.setFocusPolicy(Qt.FocusPolicy.TabFocus)  # bấm chuột không hiện vòng focus; Tab vẫn hiện cho người dùng bàn phím
         phu = _chu_phu(mo_ta, xuong_dong=True)
         phu.setIndent(32)
         super().__init__(nut, phu, dem=10)
@@ -962,7 +979,7 @@ class _TheCheDo(The):
 
     def lam_moi(self) -> None:
         chon = self.nut.isChecked()
-        self.dat(nen=self.cd["nen_nhat"] if chon else NEN_THE, vien=self.cd["chu"] if chon else VIEN, day=2 if chon else 1)
+        self.dat(nen=self.cd["nen_nhat"] if chon else NEN_APP, vien=self.cd["chu"] if chon else VIEN, day=2 if chon else 1)
         self.mo.setOpacity(0.55 if not self.isEnabled() and not chon else 1)
 
 

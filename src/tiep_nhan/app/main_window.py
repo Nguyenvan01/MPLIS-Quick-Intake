@@ -13,13 +13,18 @@ from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QListWidget, Q
 
 from .. import __version__
 from . import screens as S
-from .giao_dien import (NEN_CHON, NEN_RE, TRANG, CHE_DO, CHU, CHU_NHAN, CHU_PHU, NHAN, TRANG_THAI, VIEN, VIEN_O, VONG_FOCUS, DaiCheDo, The, _font, _font_tieu_de,
+from .giao_dien import (NEN_CHON, NEN_RE, TRANG, CHE_DO, CHU, CHU_NHAN, CHU_PHU, NHAN, TRANG_THAI, VIEN, VIEN_O, VONG_FOCUS, DaiCheDo, TY_LE, _font, _font_tieu_de,
                         ap_giao_dien, chuyen_canh, co_hieu_ung, hop_thong_bao, nap_font, ve_anh, ve_logo)
 from .screens import MAN_HINH, Phien, phien_mac_dinh
 
 SO_BUOC = 5
 TIEU_DE = f"Thêm mới nhanh hồ sơ tiếp nhận MPLIS — v{__version__}"
 DAU_CHAY_THAT = "● CHẠY THẬT – "
+K = 1 / TY_LE  # thanh bên giữ cỡ như trước khi thu nhỏ cả app
+
+
+def _k(x: float) -> int:
+    return round(x * K)
 
 
 class _DelegateNav(QStyledItemDelegate):
@@ -31,7 +36,7 @@ class _DelegateNav(QStyledItemDelegate):
         self.w = cua_so
 
     def sizeHint(self, o, i) -> QSize:
-        return QSize(0, self.CAO + (self.KE if i.row() == SO_BUOC else 0))
+        return QSize(0, _k(self.CAO + (self.KE if i.row() == SO_BUOC else 0)))
 
     def _ve_moc(self, p: QPainter, tam: QPointF, so: int, trang_thai: str) -> None:
         if trang_thai == "xong":
@@ -50,8 +55,10 @@ class _DelegateNav(QStyledItemDelegate):
 
     def paint(self, p: QPainter, o, i) -> None:
         r = i.row()
-        khung = QRect(o.rect)
+        g = o.rect
+        khung = QRect(round(g.x() / K), round(g.y() / K), round(g.width() / K), round(g.height() / K))  # toạ độ trước khi phóng
         p.save()
+        p.scale(K, K)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         if r == SO_BUOC:
             y = khung.y() + self.KE // 2
@@ -62,9 +69,9 @@ class _DelegateNav(QStyledItemDelegate):
         chon = bool(o.state & QStyle.StateFlag.State_Selected)
         p.setPen(Qt.PenStyle.NoPen)
         if self.w.y_truot is not None:  # đang trượt: mỗi dòng vẽ phần ô chọn đi qua mình, viewport cắt theo dòng
-            p.setClipRect(o.rect)
+            p.setClipRect(QRect(round(g.x() / K), round(g.y() / K), round(g.width() / K), round(g.height() / K)))
             p.setBrush(QColor(NEN_CHON))
-            p.drawRoundedRect(QRectF(khung.x(), self.w.y_truot + 2, khung.width(), self.CAO - 4), 10, 10)
+            p.drawRoundedRect(QRectF(khung.x(), self.w.y_truot / K + 2, khung.width(), self.CAO - 4), 10, 10)
             p.setClipping(False)
         elif chon:
             p.setBrush(QColor(NEN_CHON))
@@ -106,8 +113,8 @@ class MainWindow(QMainWindow):
     def __init__(self, phien: Phien | None = None) -> None:
         super().__init__()
         self.setWindowTitle(TIEU_DE)
-        self.setMinimumSize(1100, 700)
-        self.resize(1280, 820)
+        self.setMinimumSize(_k(1100), _k(700))
+        self.resize(_k(1280), _k(820))  # giữ cỡ cửa sổ trên màn hình như trước khi thu nhỏ
         self.phien = phien or phien_mac_dinh()
         self.trang_thai_buoc = ["chua"] * SO_BUOC
         self.huy_hieu: dict[int, tuple[str, str, str]] = {}
@@ -149,40 +156,31 @@ class MainWindow(QMainWindow):
     def _thanh_trai(self) -> QWidget:
         khung = QWidget()
         khung.setObjectName("khungNav")
-        khung.setFixedWidth(232)
+        khung.setFixedWidth(_k(232))
         lay = QVBoxLayout(khung)
-        lay.setContentsMargins(8, 20, 8, 2)
+        lay.setContentsMargins(_k(8), _k(20), _k(8), _k(2))
         lay.setSpacing(0)
         logo = QLabel()
-        logo.setPixmap(ve_logo(34))
+        logo.setPixmap(ve_logo(_k(34)))
         ten = QLabel("Tiếp nhận hồ sơ")
-        ten.setFont(_font_tieu_de(14))
+        ten.setFont(_font_tieu_de(_k(14)))
         cot = QVBoxLayout()
         cot.setSpacing(0)
         cot.addWidget(ten)
         hieu = QHBoxLayout()
-        hieu.setContentsMargins(4, 0, 0, 16)
-        hieu.setSpacing(10)
+        hieu.setContentsMargins(_k(4), 0, 0, _k(16))
+        hieu.setSpacing(_k(10))
         hieu.addWidget(logo)
         hieu.addLayout(cot, 1)
         nhom = QLabel("CÁC BƯỚC CỦA LÔ")
         nhom.setObjectName("nhanNhom")
-        f = _font(12, QFont.Weight.DemiBold)
-        f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 0.6)
+        f = _font(_k(12), QFont.Weight.DemiBold)
+        f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 0.6 * K)
         nhom.setFont(f)
-        nhom.setContentsMargins(8, 0, 0, 6)
-        self.lo_tieu_de, self.lo_chi_tiet = QLabel(), QLabel()
-        self.lo_tieu_de.setObjectName("nhanNhom")
-        self.lo_tieu_de.setFont(_font(12, QFont.Weight.DemiBold))
-        self.lo_chi_tiet.setObjectName("phu")
-        self.lo_chi_tiet.setFont(_font(12))
-        self.lo_chi_tiet.setWordWrap(True)
-        self.the_lo = The(self.lo_tieu_de, self.lo_chi_tiet, dem=10, bong=False)
-        self.the_lo.layout().setSpacing(2)
+        nhom.setContentsMargins(_k(8), 0, 0, _k(6))
         lay.addLayout(hieu)
         lay.addWidget(nhom)
         lay.addWidget(self.nav, 1)
-        lay.addWidget(self.the_lo)
         return khung
 
     def _lam_moi(self) -> None:
@@ -210,16 +208,6 @@ class MainWindow(QMainWindow):
         dang_o_chay = self.stack.currentIndex() == S.CHAY
         self.dai.dat(p.che_do_chay or (self.man[S.CHAY].che_do_chon() if dang_o_chay else None))
         self.setWindowTitle((DAU_CHAY_THAT if p.che_do_chay == "that" else "") + TIEU_DE)
-        if p.dang_chay and p.che_do_chay:
-            cd = CHE_DO[p.che_do_chay]
-            self.lo_tieu_de.setText("Đang ở chế độ")
-            self.lo_chi_tiet.setText(f'<b style="color:{cd["chu"]}">{cd["ten"]}</b>')
-            self.the_lo.dat(vien=cd["chu"], day=2)
-        else:
-            self.lo_tieu_de.setText("Lô đang mở")
-            che_do = "gộp theo mã đầu vào" if p.che_do.value != "moi_dong" else "mỗi dòng một hồ sơ"
-            self.lo_chi_tiet.setText(f"{p.file.name}<br>{len(lo.ho_so)} hồ sơ · {che_do}" if p.file and lo else "Chưa chọn file")
-            self.the_lo.dat(vien=VIEN, day=1)
 
     def di_toi(self, i: int) -> None:
         self.nav.setCurrentRow(i)
@@ -227,7 +215,7 @@ class MainWindow(QMainWindow):
         self._lam_moi()
 
     def _y_muc(self, i: int) -> float:
-        return self.nav.visualItemRect(self.nav.item(i)).y() + (_DelegateNav.KE if i == SO_BUOC else 0)
+        return self.nav.visualItemRect(self.nav.item(i)).y() + (_k(_DelegateNav.KE) if i == SO_BUOC else 0)
 
     def _truot(self, y: float | None) -> None:
         self.y_truot = y
@@ -283,6 +271,7 @@ def tu_kiem(w: MainWindow, ra: Path) -> bool:
 
 
 def main() -> int:
+    os.environ["QT_SCALE_FACTOR"] = str(TY_LE)  # phải đặt trước khi tạo QApplication
     app = QApplication.instance() or QApplication(sys.argv)
     ap_giao_dien(app)
     w = MainWindow()

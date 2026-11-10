@@ -125,6 +125,9 @@ def chon_ban_ghi_ca_nhan(ds: list[dict], n: Nguoi) -> dict | None:
     if not ds:
         return None
     khop = [r for r in ds if _chuan(r.get("hoTen")) == _chuan(n.ho_ten) and str(r.get("namSinh") or "").endswith(str(n.nam_sinh))]
+    # một người bị nhập trùng trong danh bạ (giống hệt nhau trừ mã): lấy bản đầu như người dùng chọn trên giao diện
+    if len({tuple(_chuan(r.get(k)) for k in ("hoTen", "namSinh", "gioiTinh", "diaChi")) for r in khop}) == 1:
+        return khop[0]
     if len(khop) != 1:
         raise RuntimeError(f"{len(ds)} cá nhân cùng số giấy tờ, không xác định được bản ghi khớp họ tên và năm sinh")
     return khop[0]
