@@ -19,7 +19,7 @@ from .pages.chuyen_quyen import ChuyenQuyenPage
 from .pages.tiep_nhan import TiepNhanPage
 from ..domain.chuan_hoa import ten_xa
 from .pages.tra_cuu import (API_TIM_THUA, API_TRA_HO_SO, TraCuuPage, chon_trung, doc_het_trang, doi_chieu_thua, gia_tri_doc,
-                            tham_so_tim_ca_nhan, tham_so_tim_thua, tham_so_tra_ho_so)
+                            tham_so_tim_ca_nhan, tham_so_tim_gcn, tham_so_tim_thua, tham_so_tra_ho_so)
 
 
 def da_dang_nhap(url: str, base_url: str) -> bool:
@@ -136,10 +136,26 @@ class PlaywrightMplis:
     def _dung_api_ghi(self) -> bool:
         return self.ghi_api and not self.settings.chay_giao_dien
 
-    def _cua_ho_so(self, ma_ho_so: str) -> G.KetQuaLuu | None:
-        """Kết quả Lưu bằng API của đúng hồ sơ này trong phiên; chạy lại hồ sơ dở từ phiên trước thì không có, dùng giao diện."""
+    def _cua_ho_so(self, hs: HoSo, ma_ho_so: str) -> G.KetQuaLuu | None:
+        """Kết quả Lưu bằng API của hồ sơ này. Hồ sơ dở (Lưu bị ngắt, phiên trước) thì dựng lại bằng lệnh đọc:
+        mã và tiến trình từ tra cứu hồ sơ, GCN từ tra cứu GCN theo thửa (cùng GCN lệnh Lưu trả, đối chiếu 10/11/2026)."""
+        if not self._dung_api_ghi():
+            return None
         r = self._da_luu
-        return r if self._dung_api_ghi() and r and r.so_bien_nhan == ma_ho_so else None
+        if r and r.so_bien_nhan == ma_ho_so:
+            return r
+        ds = self._tra_ho_so(hs, so_bien_nhan=ma_ho_so)
+        if len(ds) != 1:
+            raise RuntimeError(f"Tra cứu thấy {len(ds)} hồ sơ {ma_ho_so}")
+        r = G.doc_ket_qua_luu({"success": True, "value": ds[0], "listGiayChungNhan": [self._gcn_cua_thua(hs)]})
+        self._da_luu = r
+        self.form.url_ho_so = urljoin(self.settings.mplis_url, G.DUONG_DAN_HO_SO + r.id)
+        return r
+
+    def _gcn_cua_thua(self, hs: HoSo) -> dict:
+        t = hs.dau.thua
+        xa = self._xa_id(hs)
+        return G.chon_gcn_hien_hanh(doc_het_trang(lambda s, n: self._goi_form(G.API_TIM_GCN, tham_so_tim_gcn(xa, str(t.so_thua), str(t.so_to), s, n))))
 
     def _chuan_bi_luu(self, hs: HoSo) -> dict:
         """Mọi tra cứu và kiểm tra giao diện làm trước khi Lưu, bằng API chỉ đọc. Lỗi ở đây thì chưa ghi gì lên MPLIS."""
@@ -154,6 +170,7 @@ class PlaywrightMplis:
         if len(thua) != 1:
             raise RuntimeError(f"MPLIS có {len(thua)} thửa {d.thua.so_to}/{d.thua.so_thua}")
         G.kiem_ngan_chan(self._goi_json(G.API_NGAN_CHAN_THUA, G.than_ngan_chan_thua(thua[0], xa)), "chọn thửa")
+        G.kiem_phap_ly(self._gcn_cua_thua(hs))  # GCN chưa có pháp lý thì wizard bị chặn ở Bước 1: dừng trước khi tạo hồ sơ
         n = d.nguoi_nop
         nguoi = {"hoTen": n.ho_ten, "giayChungMinh": n.cccd or "", "diachi": n.dia_chi or ""}
         if n.cccd and not d.nguoi_nop_excel:  # có cột Người nộp thì gõ thẳng như giao diện (BR-09)
@@ -243,7 +260,7 @@ class PlaywrightMplis:
         return r.so_bien_nhan
 
     def chon_gcn(self, hs: HoSo, ma_ho_so: str) -> None:
-        r = self._cua_ho_so(ma_ho_so)
+        r = self._cua_ho_so(hs, ma_ho_so)
         if not r:
             return self.form.chon_gcn()
         if len(r.gcn) != 1:
@@ -255,7 +272,7 @@ class PlaywrightMplis:
             raise RuntimeError(f"MPLIS không gắn được GCN vào hồ sơ: {kq.get('message') or kq.get('status') or ''}")
 
     def chuyen_xu_ly(self, hs: HoSo, ma_ho_so: str) -> str:
-        r = self._cua_ho_so(ma_ho_so)
+        r = self._cua_ho_so(hs, ma_ho_so)
         if not r:
             return self.form.chuyen_xu_ly(hs)
         if not hs.dau.can_bo:

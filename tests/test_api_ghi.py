@@ -4,8 +4,8 @@ import pytest
 from tiep_nhan.domain.gom_ho_so import gom
 from tiep_nhan.domain.rules import kiem_tra_file
 from tiep_nhan.infra.excel_in import read_phieu
-from tiep_nhan.mplis.pages.tra_cuu import tham_so_tim_ca_nhan
-from tiep_nhan.mplis.api_ghi import (chon_ban_ghi_ca_nhan, chon_tai_khoan, doc_ket_qua_luu, doc_ngay_hen_tra, kiem_ngan_chan,
+from tiep_nhan.mplis.pages.tra_cuu import tham_so_tim_ca_nhan, tham_so_tim_gcn
+from tiep_nhan.mplis.api_ghi import (chon_ban_ghi_ca_nhan, chon_gcn_hien_hanh, kiem_phap_ly, chon_tai_khoan, doc_ket_qua_luu, doc_ngay_hen_tra, kiem_ngan_chan,
                                      than_chuyen, than_luu, than_ngan_chan_thua, ten_quy_trinh)
 
 GUID = "d3022e23-3933-4d30-8182-bea1097ed8c9"
@@ -121,3 +121,25 @@ def test_than_chuyen():
 def test_tham_so_tim_ca_nhan():
     ts = dict(tham_so_tim_ca_nhan("001", 0, 50))
     assert ts["model[soGiayTo]"] == "001" and ts["columns[1][data]"] == "caNhanId" and ts["length"] == "50"
+
+
+def test_tham_so_tim_gcn():
+    ts = dict(tham_so_tim_gcn(12031, "1265", "2"))
+    assert (ts["model[xaId]"], ts["model[soThuTuThua]"], ts["model[soHieuToBanDo]"]) == ("12031", "1265", "2")
+    assert ts["columns[1][data]"] == "soPhatHanh" and ts["model[soPhatHanh]"] == ""
+
+
+def test_chon_gcn_hien_hanh():
+    cu = {"giayChungNhanId": 1, "Id": GUID, "isLastest": False}
+    moi = {"giayChungNhanId": 2, "Id": GUID, "isLastest": True}
+    assert chon_gcn_hien_hanh([cu, moi]) == moi
+    with pytest.raises(RuntimeError, match="0 GCN"):
+        chon_gcn_hien_hanh([cu])
+    with pytest.raises(RuntimeError, match="2 GCN"):
+        chon_gcn_hien_hanh([moi, dict(moi, giayChungNhanId=3)])
+
+
+def test_kiem_phap_ly():
+    kiem_phap_ly({"daCongNhanPhapLy": True})
+    with pytest.raises(RuntimeError, match="pháp lý"):
+        kiem_phap_ly({"daCongNhanPhapLy": False})

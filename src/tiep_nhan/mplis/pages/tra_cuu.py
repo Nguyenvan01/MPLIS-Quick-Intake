@@ -47,6 +47,16 @@ def tham_so_tim_thua(xa_id: int, so_thua: str, so_to: str, start: int = 0, lengt
     return ts + [(f"model[{k}]", str(v)) for k, v in m]
 
 
+def tham_so_tim_gcn(xa_id: int, so_thua: str, so_to: str, start: int = 0, length: int = 100) -> list[tuple[str, str]]:
+    """Tra cứu GCN theo thửa (màn "Cập nhật thành phần hồ sơ" → Tra cứu), lấy từ lượt người dùng làm mẫu 10/11/2026."""
+    ts = _tham_so_bang(["", "soPhatHanh", "soHoSoGoc", "soVaoSo", "ngayVaoSo", "maVach"], start, length)
+    m = [("xaId", xa_id), ("huyenId", ""), ("loaiGiayChungNhanId", ""), ("soPhatHanh", ""), ("maVach", ""), ("soVaoSo", ""),
+         ("soVaoSoCu", ""), ("ngayVaoSo", ""), ("soHoSoGoc", ""), ("soHoSoGocCu", ""), ("hoTen", ""), ("soGiayTo", ""), ("namSinh", ""),
+         ("soThuTuThua", so_thua), ("soHieuToBanDo", so_to), ("soThuTuThuaCu", ""), ("soHieuToBanDoCu", ""), ("soNha", ""),
+         ("diaChiChiTiet", ""), ("tuNgayVaoSo", ""), ("denNgayVaoSo", "")]
+    return ts + [(f"model[{k}]", str(v)) for k, v in m]
+
+
 def doc_het_trang(mot_trang: Callable[[int, int], dict], length: int = 100, toi_da: int = 5000) -> list[dict[str, Any]]:
     """Đọc mọi trang (không dừng ở 10 kết quả đầu như giao diện)."""
     kq: list[dict[str, Any]] = []

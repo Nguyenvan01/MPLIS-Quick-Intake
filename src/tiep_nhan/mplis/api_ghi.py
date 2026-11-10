@@ -21,6 +21,7 @@ API_NGAN_CHAN_GCN = "/dc/DangKyAjax/KiemTraNganChanThanhPhanHoSoTruocBienDongByG
 API_THEM_GCN = "/dc/DangKyAjax/AddGiayChungNhanVaoThanhPhanHoSo"
 API_DA_XU_LY = "/dc/DangKyAjax/UpdateTacVuDaXuLy"
 API_CHUYEN = "/dc/WorkflowAjax/executeCommand"
+API_TIM_GCN = "/dc/DangKyAjax/AdvancedSearchGiayChungNhan"  # chỉ đọc; trả GCN theo thửa kèm daCongNhanPhapLy
 DUONG_DAN_HO_SO = "/dc/TiepNhanHoSo/CapNhatHoSo?id="
 
 _GUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
@@ -127,6 +128,20 @@ def chon_ban_ghi_ca_nhan(ds: list[dict], n: Nguoi) -> dict | None:
     if len(khop) != 1:
         raise RuntimeError(f"{len(ds)} cá nhân cùng số giấy tờ, không xác định được bản ghi khớp họ tên và năm sinh")
     return khop[0]
+
+
+def chon_gcn_hien_hanh(ds: list[dict]) -> dict:
+    """GCN đang hiệu lực của thửa (isLastest), đúng cái lệnh Lưu trả về (đối chiếu 4 hồ sơ thật 10/11/2026)."""
+    hien = [g for g in ds if g.get("isLastest")]
+    if len(hien) != 1:
+        raise RuntimeError(f"MPLIS có {len(hien)} GCN hiện hành của thửa, cần người chọn")
+    return hien[0]
+
+
+def kiem_phap_ly(gcn: dict) -> None:
+    """Wizard chuyển quyền bị MPLIS chặn ở Bước 1 nếu GCN cũ chưa có pháp lý: dừng trước khi Lưu."""
+    if not gcn.get("daCongNhanPhapLy"):
+        raise RuntimeError("GCN cũ của thửa chưa có pháp lý trên MPLIS: cập nhật pháp lý GCN rồi chạy lại")
 
 
 def chon_tai_khoan(ds: dict[str, str], ten: str) -> str:
