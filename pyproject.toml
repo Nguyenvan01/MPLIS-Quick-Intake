@@ -1,6 +1,6 @@
 [project]
 name = "tiep-nhan-mplis"
-version = "0.3.3"
+version = "0.3.4"
 description = "Thêm mới nhanh hồ sơ tiếp nhận MPLIS từ file Excel phiếu chuyển"
 requires-python = ">=3.13,<3.14"
 dependencies = [

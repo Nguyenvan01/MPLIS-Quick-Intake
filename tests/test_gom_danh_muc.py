@@ -38,7 +38,7 @@ DU_BANG = {"loai_nha": {"L": "x"}, "cap_nha": {"C": "x"}, "ket_cau": {"K": "x"},
 
 def _hs_dia_chi(dia_chi: str, **thieu):
     from types import SimpleNamespace as N
-    nha = {"loai_nha": "L", "cap_nha": "C", "ket_cau": "K"}
+    nha = {"loai_nha": "L", "cap_nha": "C", "ket_cau": "K", "dt_xay_dung": 60, "dt_san": 240}
     thua = {"thoi_han": "T", "dia_chi": dia_chi}
     nha.update({k: v for k, v in thieu.items() if k in nha})
     thua.update({k: v for k, v in thieu.items() if k in thua})
@@ -46,7 +46,7 @@ def _hs_dia_chi(dia_chi: str, **thieu):
 
 
 @pytest.mark.parametrize("trong", [None, ""])
-@pytest.mark.parametrize("truong", ["loai_nha", "cap_nha", "ket_cau", "thoi_han"])
+@pytest.mark.parametrize("truong", ["loai_nha", "cap_nha", "ket_cau", "thoi_han", "dt_xay_dung", "dt_san"])
 def test_br05_truong_wizard_trong_thi_chan_truoc_khi_chay(truong, trong):
     loi = DanhMuc(DU_BANG).kiem_tra([_hs_dia_chi("Lô A", **{truong: trong})])
     assert [(v.excel_row, v.muc, v.ma) for v in loi] == [(7, "loi", "BR-05")]
