@@ -30,8 +30,8 @@ Dòng tiêu đề là dòng có ô `STT` (file mẫu: dòng 5), nhóm Ông/Bà �
 | Căn cứ | Xác nhận Vinhomes | — | Số phụ lục, ngày |
 | Người nhận – Ông | Họ và tên, Năm sinh, CCCD, Địa chỉ | Ông hoặc Bà | CCCD dạng chữ, 12 số |
 | Người nhận – Bà | Họ và tên, Năm sinh, CCCD, Địa chỉ | Ông hoặc Bà | |
-| Thửa đất | Thửa đất, Số tờ, Diện tích (m2), Mã phát hành, Thời hạn sử dụng đất, Đường | Tờ, thửa | Dấu phẩy thập phân |
-| Nhà ở | Loại nhà, Cấp nhà, DT xây dựng, DT sàn, Số tầng, Năm hoàn công, Kết cấu | — | "5 tầng" → 5 |
+| Thửa đất | Thửa đất, Số tờ, Diện tích (m2), Mã phát hành, Thời hạn sử dụng đất, Đường | Tờ, thửa | Dấu phẩy thập phân. Đường là địa chỉ tài sản đầy đủ (tên căn, khu, xã, tỉnh): ghi nguyên cho nhà; địa chỉ thửa trên GCN chỉ lấy phần "xã/phường … trở đi" (trùng địa chỉ tài sản thì MPLIS không in địa chỉ tài sản). Đoạn trống ", ," tự bỏ |
+| Nhà ở | Loại nhà, Cấp nhà, DT xây dựng, DT sàn, Số tầng, Năm hoàn công, Kết cấu | — | "5 tầng" → 5, điền vào ô Số tầng của nhà |
 | Xử lý | Mẫu nhà, Phân loại đường, Cán bộ XL, Mã đầu vào | Mã đầu vào | |
 
 ## Quy tắc nghiệp vụ

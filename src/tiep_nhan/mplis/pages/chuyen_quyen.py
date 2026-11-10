@@ -203,6 +203,7 @@ class ChuyenQuyenPage(TiepNhanPage):
         o = self._o("o_thoi_han", m)
         o.fill(v)
         expect(o).to_have_value(v)
+        self._dia_chi_chi_tiet(m, d.thua.dia_chi_thua_dat)  # thửa chỉ ghi "xã…, tỉnh…" để GCN in được địa chỉ tài sản
         self._el("nut_luu_thua", m).click()
         expect(self._hien("modal_tai_san")).to_have_count(0)
         self._khong_co_hop("lưu thời hạn")
@@ -224,14 +225,24 @@ class ChuyenQuyenPage(TiepNhanPage):
         o.press_sequentially(f"{d.nha.dt_san:g}", delay=120)  # fill() làm ô này trống
         self._o("o_so_nha", m).click()
         expect(o).to_have_value(re.compile(rf"^{re.escape(f'{d.nha.dt_san:g}')}"))
+        if d.nha.so_tang:
+            self._o("o_so_tang", m).fill(str(d.nha.so_tang))
+        self._dia_chi_chi_tiet(m, d.thua.dia_chi or "")  # địa chỉ tài sản đủ tên căn, như cột Đường
+        self._el("nut_luu_nha", m).click()
+        expect(self._hien("modal_tai_san")).to_have_count(0)
+        self._khong_co_hop("lưu nhà")
+
+    def _dia_chi_chi_tiet(self, m: Locator, gia_tri: str) -> None:
+        """Hộp thửa và hộp nhà dùng chung khối Địa chỉ: mở, đánh dấu địa chỉ chính, ghi Địa chỉ chi tiết."""
         self._el("mo_dia_chi", m).first.click()
         chinh = self._o("o_dia_chi_chinh", m)
         expect(chinh).to_be_visible()
         if not chinh.is_checked():
             chinh.click()
-        self._el("nut_luu_nha", m).click()
-        expect(self._hien("modal_tai_san")).to_have_count(0)
-        self._khong_co_hop("lưu nhà")
+        if gia_tri:
+            o = self._o("o_dia_chi", m)
+            o.fill(gia_tri)
+            expect(o).to_have_value(gia_tri)
 
     def _luu_dang_ky(self) -> None:
         w = self._wiz()

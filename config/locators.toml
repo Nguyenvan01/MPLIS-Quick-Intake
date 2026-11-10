@@ -129,6 +129,7 @@ o_dt_xay_dung  = { by = "css", value = "[name=dienTichXayDung]" }
 o_dt_su_dung   = { by = "css", value = "[name=dienTichSuDung]" }
 mo_dia_chi     = { by = "text", text = "Địa chỉ chi tiết:", exact = false }
 o_dia_chi_chinh = { by = "css", value = "[name=laDiaChiChinh]" }
+o_so_tang      = { by = "css", value = "[name=soTang]" }   # hộp Nhà riêng lẻ, nhãn "Số tầng" (đọc DOM hồ sơ 9082, 10/11/2026)
 nut_luu_nha    = { by = "css", value = "[id^=btnSaveNhaRiengLe]" }
 
 o_quyen_su_dung = { by = "css", value = "[name=coQuyenSuDung]" }
