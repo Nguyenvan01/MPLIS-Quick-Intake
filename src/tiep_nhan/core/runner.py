@@ -36,7 +36,7 @@ def _doi_so_phat_hanh(hs: HoSo, so: str) -> HoSo:
 
 class _DoGio:
     """Bọc port để cộng dồn thời gian các bước gọi lên MPLIS (task 3.5)."""
-    BUOC = ("tim_trung", "mo_form", "dien", "luu", "chon_gcn", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "doc")
+    BUOC = ("tim_trung", "mo_form", "dien", "luu", "chon_gcn", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "mo_du_thao", "doc")
 
     def __init__(self, port: MplisPort):
         self._port = port
@@ -236,6 +236,11 @@ class Runner:
             # wizard ghi dần lên máy chủ nên chạy lại có thể ghi lặp: để người kiểm tra
             self.store.mark(hs.key, TrangThai.CAN_KIEM_TRA, che_so_trong_chu(f"Wizard dở: {str(e).splitlines()[0][:150]}"), ma)
             raise
+        try:
+            self.port.mo_du_thao(hs, ma)
+        except Exception as e:
+            # đã Hoàn tất trên MPLIS rồi: không mở được dự thảo thì chỉ ghi chú, người dùng mở tay
+            note_ok = f"{note_ok}; chưa mở được Dự thảo GCN: {che_so_trong_chu(str(e).splitlines()[0][:100])}"
         self._xac_nhan(hs, ma, note_ok)
 
     def _xac_nhan(self, hs: HoSo, ma: str, note_ok: str) -> None:

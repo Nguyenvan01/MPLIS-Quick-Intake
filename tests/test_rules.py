@@ -48,7 +48,7 @@ def test_br01_khong_co_nguoi():
 def test_br03_trung_to_thua():
     r = ReadResult(sheet="s", header_row=5, columns={}, rows=[_raw(6), _raw(7, stt=2)])
     rows, issues = kiem_tra_file(r)
-    assert len(rows) == 1 and any(i.ma == "BR-03" and i.muc == "loi" for i in issues)
+    assert len(rows) == 1 and any(i.ma == "BR-03" and i.muc == "canh_bao" for i in issues)  # loại dòng trùng, không chặn cả lô
 
 
 def test_cccd_dang_so_mat_so_0():
@@ -167,3 +167,15 @@ def test_cot_nguoi_nop_trong_thi_giu_mac_dinh():
 def test_so_phat_hanh_hop_le_hai_chu_tam_so(so, mong):
     from tiep_nhan.domain.chuan_hoa import so_phat_hanh_hop_le
     assert so_phat_hanh_hop_le(so) is mong
+
+
+def test_trung_to_thua_trong_file_thi_loai_dong_sau_va_chi_canh_bao():
+    def dong(r, stt, ten):
+        return RawRow(excel_row=r, values={"stt": stt, "ma_dau_vao": f"M-{stt}", "so_to": 3, "so_thua": 3549, "dien_tich": 56, "ong_ho_ten": ten})
+    kq = ReadResult(sheet="S", header_row=5, columns={}, rows=[dong(6, 1, "Người A"), dong(7, 2, "Người B"),
+                    RawRow(excel_row=8, values={"stt": 3, "ma_dau_vao": "M-3", "so_to": 3, "so_thua": 3550, "dien_tich": 60, "ong_ho_ten": "Người C"})])
+    rows, van_de = kiem_tra_file(kq)
+    assert [r.excel_row for r in rows] == [6, 8]
+    trung = [v for v in van_de if v.ma == "BR-03"]
+    assert len(trung) == 1 and trung[0].muc == "canh_bao" and trung[0].excel_row == 7
+    assert "3/3549" in trung[0].noi_dung and "dòng 6" in trung[0].noi_dung and "đã loại" in trung[0].noi_dung

@@ -25,13 +25,22 @@ def tham_so_tra_ho_so(xa_id: int, so_thua: str = "", so_to: str = "", so_bien_nh
     return [("start", str(start)), ("length", str(length))] + [(f"model[{k}]", str(v)) for k, v in m]
 
 
-def tham_so_tim_thua(xa_id: int, so_thua: str, so_to: str, start: int = 0, length: int = 100) -> list[tuple[str, str]]:
-    cot = ["", "soThuTuThua", "soHieuToBanDo", "dienTich", "diaChi", "ListMucDichSuDung"]
+def _tham_so_bang(cot: list[str], start: int, length: int) -> list[tuple[str, str]]:
     ts = [("draw", "1")]
     for i, c in enumerate(cot):
         ts += [(f"columns[{i}][data]", c), (f"columns[{i}][name]", ""), (f"columns[{i}][searchable]", "true"),
                (f"columns[{i}][orderable]", "false"), (f"columns[{i}][search][value]", ""), (f"columns[{i}][search][regex]", "false")]
-    ts += [("start", str(start)), ("length", str(length)), ("search[value]", ""), ("search[regex]", "false")]
+    return ts + [("start", str(start)), ("length", str(length)), ("search[value]", ""), ("search[regex]", "false")]
+
+
+def tham_so_tim_ca_nhan(so_giay_to: str, start: int = 0, length: int = 100) -> list[tuple[str, str]]:
+    ts = _tham_so_bang(["", "caNhanId", "hoTen", "gioiTinh", "namSinh", "diaChi"], start, length)
+    m = [("hoTen", ""), ("soGiayTo", so_giay_to), ("namSinh", ""), ("diaChiChiTiet", "")]
+    return ts + [(f"model[{k}]", v) for k, v in m]
+
+
+def tham_so_tim_thua(xa_id: int, so_thua: str, so_to: str, start: int = 0, length: int = 100) -> list[tuple[str, str]]:
+    ts = _tham_so_bang(["", "soThuTuThua", "soHieuToBanDo", "dienTich", "diaChi", "ListMucDichSuDung"], start, length)
     m = [("soThuTuThua", so_thua), ("soHieuToBanDo", so_to), ("soThuTuThuaCu", ""), ("soHieuToBanDoCu", ""), ("loaiMucDichSuDungId", ""),
          ("loaiNguonGocSuDungDatId", ""), ("thoiHanSuDung", ""), ("ngaySuDungTu", ""), ("ngaySuDungDen", ""), ("diaChiThua", ""),
          ("xaId", xa_id), ("huyenId", 0)]

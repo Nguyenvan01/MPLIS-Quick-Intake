@@ -143,3 +143,8 @@ o_vpdk         = { by = "css", value = "#rdVPCap" }
 o_so_vao_so    = { by = "css", value = "[name=soVaoSo]" }
 o_nguoi_ky     = { by = "css", value = "[name=tenNguoiKy]" }
 nut_luu_gcn    = { by = "css", value = "#btnLuuChiTietGiayChungNhan" }
+
+# Bước 16 "Dự thảo giấy chứng nhận" sau Hoàn tất, lấy từ bản ghi harvest 08/11/2026 và video v1.
+dong_gcn_du_thao = { by = "css", value = "#tblGiayChungNhan tbody tr:not(:has(td.dataTables_empty))" }
+nut_du_thao    = { by = "css", value = "a[id^=btnInGiayChungNhan-]" }
+modal_du_thao  = { by = "css", value = "div[id^=mdlDuThaoGiayChungNhan-]" }

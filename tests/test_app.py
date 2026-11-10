@@ -537,3 +537,19 @@ def test_cai_dat_tuy_chon_chay_tren_giao_dien(cua_so):
     assert not m.tich["chay_giao_dien"].isChecked()  # mặc định dùng API để tra cứu
     m.tich["chay_giao_dien"].setChecked(True)
     assert Settings.load().chay_giao_dien is True
+
+
+def test_nap_file_trung_to_thua_thi_bao_va_loai_dong_trung(cua_so, mau, tmp_path, monkeypatch):
+    import openpyxl
+    wb = openpyxl.load_workbook(mau)
+    ws = wb.active
+    ws.cell(8, 14).value, ws.cell(8, 15).value = ws.cell(7, 14).value, ws.cell(7, 15).value  # dòng 8 trùng tờ/thửa dòng 7
+    f = tmp_path / "trung.xlsx"
+    wb.save(f)
+    bao = []
+    monkeypatch.setattr(S, "hop_thong_bao", lambda _w, tieu_de, chu, *a, **k: bao.append((tieu_de, chu)))
+    cua_so.man[S.LO_MOI].mo_file(f)
+    lo = cua_so.phien.lo
+    assert [h.dau.excel_row for h in lo.ho_so] == [6, 7]
+    assert len(bao) == 1 and "dòng 8" in bao[0][1] and "dòng 7" in bao[0][1]
+    assert not [v for v in lo.van_de if v.ma == "BR-03" and v.muc == "loi"]

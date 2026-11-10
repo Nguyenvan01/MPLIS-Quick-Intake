@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 
 from loguru import logger
@@ -13,12 +13,13 @@ from playwright.sync_api import expect, sync_playwright
 from ..domain.danh_muc import DanhMuc
 from ..domain.models import HoSo
 from ..infra.config import BROWSER_PROFILE, SHOT_DIR, TRACE_DIR, Settings
+from . import api_ghi as G
 from .locators import Locators
 from .pages.chuyen_quyen import ChuyenQuyenPage
 from .pages.tiep_nhan import TiepNhanPage
 from ..domain.chuan_hoa import ten_xa
 from .pages.tra_cuu import (API_TIM_THUA, API_TRA_HO_SO, TraCuuPage, chon_trung, doc_het_trang, doi_chieu_thua, gia_tri_doc,
-                            tham_so_tim_thua, tham_so_tra_ho_so)
+                            tham_so_tim_ca_nhan, tham_so_tim_thua, tham_so_tra_ho_so)
 
 
 def da_dang_nhap(url: str, base_url: str) -> bool:
@@ -74,6 +75,9 @@ class PlaywrightMplis:
     def __init__(self, settings: Settings, L: Locators, dm: DanhMuc):
         self.settings, self.L, self.dm = settings, L, dm
         self.hoi_so_moi = None  # giao diện gán vào để hỏi số mới khi MPLIS báo trùng
+        self.ghi_api = False    # Worker bật khi chạy thật: Lưu, gắn GCN, chuyển Thụ lý gọi thẳng API (Đợt 1)
+        self._cho_luu: dict | None = None
+        self._da_luu: G.KetQuaLuu | None = None
 
     def __enter__(self) -> "PlaywrightMplis":
         if getattr(sys, "frozen", False):  # bản đóng gói mang Chromium theo trong thư mục cài
@@ -124,6 +128,44 @@ class PlaywrightMplis:
             raise RuntimeError(f"MPLIS không trả lời {duong_dan.rsplit('/', 1)[-1]}: {kq.get('status', '')}")
         return kq
 
+    def _goi_json(self, duong_dan: str, than: dict) -> dict:
+        if not da_dang_nhap(self.page.url, self.settings.mplis_url):
+            self.cho_dang_nhap()
+        return self.page.evaluate(JS_KIEM_SO, [urljoin(self.settings.mplis_url, duong_dan), [than]])[0]
+
+    def _dung_api_ghi(self) -> bool:
+        return self.ghi_api and not self.settings.chay_giao_dien
+
+    def _cua_ho_so(self, ma_ho_so: str) -> G.KetQuaLuu | None:
+        """Kết quả Lưu bằng API của đúng hồ sơ này trong phiên; chạy lại hồ sơ dở từ phiên trước thì không có, dùng giao diện."""
+        r = self._da_luu
+        return r if self._dung_api_ghi() and r and r.so_bien_nhan == ma_ho_so else None
+
+    def _chuan_bi_luu(self, hs: HoSo) -> dict:
+        """Mọi tra cứu và kiểm tra giao diện làm trước khi Lưu, bằng API chỉ đọc. Lỗi ở đây thì chưa ghi gì lên MPLIS."""
+        if len(hs.dong) != 1:
+            raise NotImplementedError("Chưa xác minh luồng gộp nhiều dòng vào một hồ sơ")
+        d, xa = hs.dau, self._xa_id(hs)
+        ds = doc_het_trang(lambda s, n: self._goi_form(API_TIM_THUA, tham_so_tim_thua(xa, str(d.thua.so_thua), str(d.thua.so_to), s, n)))
+        lech = doi_chieu_thua(ds, hs)
+        if lech:
+            raise RuntimeError(lech)
+        thua = [r for r in ds if (str(r.get("soThuTuThua")), str(r.get("soHieuToBanDo"))) == (str(d.thua.so_thua), str(d.thua.so_to))]
+        if len(thua) != 1:
+            raise RuntimeError(f"MPLIS có {len(thua)} thửa {d.thua.so_to}/{d.thua.so_thua}")
+        G.kiem_ngan_chan(self._goi_json(G.API_NGAN_CHAN_THUA, G.than_ngan_chan_thua(thua[0], xa)), "chọn thửa")
+        n = d.nguoi_nop
+        nguoi = {"hoTen": n.ho_ten, "giayChungMinh": n.cccd or "", "diachi": n.dia_chi or ""}
+        if n.cccd and not d.nguoi_nop_excel:  # có cột Người nộp thì gõ thẳng như giao diện (BR-09)
+            r = G.chon_ban_ghi_ca_nhan(doc_het_trang(lambda s, k: self._goi_form(G.API_TIM_CA_NHAN, tham_so_tim_ca_nhan(n.cccd or "", s, k))), n)
+            if r:  # ponytail: nhánh này chưa có lượt thật để đối chiếu (13 trace đều gõ tay); lần đầu chạy API cần xem lại hồ sơ
+                nguoi.update(hoTen=str(r.get("hoTen") or n.ho_ten), diachi=str(r.get("diaChi") or n.dia_chi or ""), caNhanId=str(r["caNhanId"]))
+        ma = f"QD_1_012787_{self.settings.quy_trinh}"
+        bay_gio = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:00.000Z")
+        return G.than_luu(hs, xa_id=xa, thua=thua[0], nguoi_nop=nguoi,
+                          quy_trinh=(ma, G.ten_quy_trinh(self._goi_json(G.API_QUY_TRINH, {}), ma)), ngay_tiep_nhan=bay_gio,
+                          ngay_hen_tra=G.doc_ngay_hen_tra(self._goi_json(G.API_NGAY_HEN_TRA, {"ngayTiepNhan": bay_gio, "schemaCode": [ma]})))
+
     def _xa_id(self, hs: HoSo) -> int:
         v = self.dm.anh_xa("xa", ten_xa(hs.dau.thua.dia_chi))
         if not (v and v.isdigit()):
@@ -169,10 +211,16 @@ class PlaywrightMplis:
         return {x["UserName"]: (x.get("FullName") or "").strip() for x in kq.get("value") or [] if x.get("UserName")}
 
     def mo_form(self) -> None:
+        self._cho_luu = None
+        if self._dung_api_ghi():
+            return
         self.form.quy_trinh = self.settings.quy_trinh
         self.form.mo()
 
     def dien(self, hs: HoSo) -> None:
+        if self._dung_api_ghi():
+            self._cho_luu = self._chuan_bi_luu(hs)
+            return
         self.form.dien(hs)
 
     def chup(self, key: str) -> str:
@@ -184,13 +232,42 @@ class PlaywrightMplis:
         self.form.huy()
 
     def luu(self) -> str:
-        return self.form.luu()
+        if not self._dung_api_ghi():
+            return self.form.luu()
+        than, self._cho_luu, self._da_luu = self._cho_luu, None, None
+        if than is None:
+            raise RuntimeError("Chưa chuẩn bị dữ liệu Lưu")
+        r = G.doc_ket_qua_luu(self._goi_json(G.API_LUU, than))
+        self._da_luu = r
+        self.form.url_ho_so = urljoin(self.settings.mplis_url, G.DUONG_DAN_HO_SO + r.id)
+        return r.so_bien_nhan
 
     def chon_gcn(self, hs: HoSo, ma_ho_so: str) -> None:
-        self.form.chon_gcn()
+        r = self._cua_ho_so(ma_ho_so)
+        if not r:
+            return self.form.chon_gcn()
+        if len(r.gcn) != 1:
+            raise RuntimeError(f"Thửa có {len(r.gcn)} GCN, cần người chọn")
+        g = r.gcn[0]
+        G.kiem_ngan_chan(self._goi_json(G.API_NGAN_CHAN_GCN, {"giayChungNhanIds": [g["giayChungNhanId"]], "hoSoTiepNhanId": r.id}), "chọn GCN")
+        kq = self._goi_json(G.API_THEM_GCN, {"hoSoTiepNhanId": r.id, "guids": [g["Id"]]})
+        if not (kq.get("success") and kq.get("value") is True):
+            raise RuntimeError(f"MPLIS không gắn được GCN vào hồ sơ: {kq.get('message') or kq.get('status') or ''}")
 
     def chuyen_xu_ly(self, hs: HoSo, ma_ho_so: str) -> str:
-        return self.form.chuyen_xu_ly(hs)
+        r = self._cua_ho_so(ma_ho_so)
+        if not r:
+            return self.form.chuyen_xu_ly(hs)
+        if not hs.dau.can_bo:
+            raise ValueError("Excel thiếu Cán bộ XL")
+        tk = G.chon_tai_khoan(self.ds_nguoi_xu_ly(), hs.dau.can_bo)
+        kq = self._goi_json(G.API_DA_XU_LY, {"hoSoTiepNhanId": r.id, "actionCode": "XuLyHoSo", "daXuLy": True})
+        if not kq.get("success"):
+            raise RuntimeError(f"MPLIS không đánh dấu được đã xử lý: {kq.get('message') or kq.get('status') or ''}")
+        kq = self._goi_json(G.API_CHUYEN, G.than_chuyen(self.settings.quy_trinh, r.id, r.process_id, tk))
+        if not (kq.get("success") and kq.get("value") is True):
+            raise RuntimeError(f"MPLIS không chuyển được cho {tk}: {kq.get('message') or kq.get('status') or ''}")
+        return tk
 
     def dien_chuyen_quyen(self, hs: HoSo, ma_ho_so: str) -> None:
         self.wizard.url_ho_so = self.form.url_ho_so
@@ -199,6 +276,10 @@ class PlaywrightMplis:
 
     def hoan_tat(self, hs: HoSo, ma_ho_so: str) -> None:
         self.wizard.hoan_tat()
+
+    def mo_du_thao(self, hs: HoSo, ma_ho_so: str) -> None:
+        self.wizard.url_ho_so = self.form.url_ho_so
+        self.wizard.mo_du_thao()
 
     def doc(self, hs: HoSo, ma_ho_so: str) -> dict[str, str]:
         if self.settings.chay_giao_dien:

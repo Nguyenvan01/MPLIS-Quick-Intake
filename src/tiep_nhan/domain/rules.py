@@ -82,9 +82,9 @@ def kiem_tra_file(result: ReadResult) -> tuple[list[DongPhieu], list[VanDe]]:
         if dong is None:
             continue
         k = (dong.thua.so_to, dong.thua.so_thua)
-        if k in seen:  # BR-03
-            issues.append(VanDe(excel_row=raw.excel_row, muc="loi", ma="BR-03",
-                                noi_dung=f"Trùng tờ/thửa {k[0]}/{k[1]} với dòng {seen[k]} — bỏ qua"))
+        if k in seen:  # BR-03: tờ + thửa là duy nhất; giữ dòng đầu, loại dòng sau, báo nhưng không chặn cả lô
+            issues.append(VanDe(excel_row=raw.excel_row, muc="canh_bao", ma="BR-03",
+                                noi_dung=f"Trùng tờ/thửa {k[0]}/{k[1]} với dòng {seen[k]} — đã loại khỏi lô"))
             continue
         ph = dong.thua.ma_phat_hanh
         if ph and ph in seen_ph:  # BR-03

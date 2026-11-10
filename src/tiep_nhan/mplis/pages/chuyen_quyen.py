@@ -61,9 +61,44 @@ class ChuyenQuyenPage(TiepNhanPage):
         expect(self._wiz()).to_be_visible()
         self._cho()
 
+    def mo_du_thao(self) -> None:
+        """Bước 16: Quy trình xử lý → Dự thảo giấy chứng nhận → chọn GCN → mở màn dự thảo. Không bấm Lưu dự thảo."""
+        q = self._el("modal_quy_trinh")
+        if not q.is_visible():  # sau Hoàn tất MPLIS để nguyên hộp Quy trình; chạy lại hoặc đã rời trang thì mở lại
+            self._ve_ho_so()
+            self._el("nut_xu_ly").click()
+            expect(q).to_be_visible()
+        self._cho()
+        tac_vu = self._el("dong_tac_vu", q).filter(has_text="Dự thảo giấy chứng nhận")
+        expect(tac_vu).to_have_count(1)
+        self._el("lk_xu_ly", tac_vu).click()
+        dong = self._el("dong_gcn_du_thao", self._wiz())
+        expect(dong).to_have_count(1, timeout=60_000)  # hồ sơ chuyển quyền trọn giấy chỉ có một GCN mới
+        dong.click()
+        self._hien("nut_du_thao", self._wiz()).click()
+        expect(self._hien("modal_du_thao")).to_be_visible(timeout=60_000)
+        self._cho()
+
     def _sau(self, den_buoc: int) -> None:
-        self._el("nut_buoc_sau", self._wiz()).click()
-        expect(self._el("buoc_hien", self._wiz()).filter(has_text=f"Bước {den_buoc}")).to_be_visible(timeout=90_000)
+        # MPLIS từ chối qua bước (vd "GCN chưa có pháp lý") chỉ hiện thông báo thoáng qua; đọc lý do từ phản hồi để báo người dùng
+        phan_hoi: list = []
+        nghe = lambda r: "ChuyenQuyenTronGiayBuoc" in r.url and phan_hoi.append(r)  # noqa: E731
+        self.page.on("response", nghe)
+        try:
+            self._el("nut_buoc_sau", self._wiz()).click()
+            expect(self._el("buoc_hien", self._wiz()).filter(has_text=f"Bước {den_buoc}")).to_be_visible(timeout=90_000)
+        except AssertionError:
+            for r in phan_hoi:
+                try:
+                    kq = r.json()
+                except Exception:  # noqa: BLE001
+                    continue
+                if isinstance(kq, dict) and kq.get("success") is False:
+                    ly_do = " ".join(re.sub(r"<[^>]+>", " ", str(kq.get("Error") or kq.get("message") or "")).split())
+                    raise RuntimeError(f"MPLIS không cho sang Bước {den_buoc}: {ly_do}") from None
+            raise
+        finally:
+            self.page.remove_listener("response", nghe)
         self._cho()
 
     def _dien_nguoi(self, n: Nguoi) -> None:
