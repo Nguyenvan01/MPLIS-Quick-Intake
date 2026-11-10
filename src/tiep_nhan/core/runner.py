@@ -7,7 +7,9 @@ from time import perf_counter
 
 from loguru import logger
 
+from ..domain.chuan_hoa import chuan_ma_phat_hanh
 from ..domain.models import HoSo
+from ..infra.logging import che_so_trong_chu
 from ..mplis.port import MplisPort, SoPhatHanhTrung, so_sanh
 from .state import StateStore, TrangThai
 
@@ -24,6 +26,12 @@ class RunOptions:
 
 
 MOC_SAU_LUU = (TrangThai.DA_LUU, TrangThai.DA_CHON_GCN, TrangThai.DA_CHUYEN_XU_LY, TrangThai.DANG_HOAN_TAT)
+
+
+def _doi_so_phat_hanh(hs: HoSo, so: str) -> HoSo:
+    d = hs.dong[0]
+    thua = d.thua.model_copy(update={"ma_phat_hanh": so})
+    return hs.model_copy(update={"dong": (d.model_copy(update={"thua": thua}),) + hs.dong[1:]})
 
 
 class _DoGio:
@@ -51,12 +59,15 @@ class _DoGio:
 class Runner:
     def __init__(self, ho_so: list[HoSo], port: MplisPort, store: StateStore, opts: RunOptions,
                  on_event: EventFn | None = None, should_stop: Callable[[], bool] = lambda: False):
-        self.ho_so, self.store, self.opts = ho_so, store, opts
+        self.ho_so, self.store, self.opts = list(ho_so), store, opts  # bản sao: quét số có thể thay hồ sơ bằng bản đã đổi số
         self.port = _DoGio(port)
         self.emit = on_event or (lambda *a: None)
         self.should_stop = should_stop
 
     def run(self) -> None:
+        if not self.opts.dry_run:
+            self._quet_thua()
+            self._quet_so_phat_hanh()
         for hs in self.ho_so:
             if self.should_stop():
                 logger.warning("Dừng theo yêu cầu người dùng")
@@ -65,6 +76,56 @@ class Runner:
             self.mot_ho_so(hs)
             if self.port.giay:
                 logger.info(f"Thời gian {hs.key}: " + ", ".join(f"{k} {v:.1f}s" for k, v in self.port.giay.items()))
+
+    def _so_da_cap(self, ds: list[str]) -> set[str]:
+        try:
+            return self.port.so_da_cap(ds)
+        except Exception as e:  # noqa: BLE001 — không quét được thì wizard vẫn tự báo khi trùng số
+            logger.warning(f"Không kiểm tra được số phát hành trên MPLIS: {type(e).__name__}: {str(e)[:150]}")
+            return set()
+
+    def _quet_thua(self) -> None:
+        """Đối chiếu thửa và diện tích trên MPLIS cho cả lô trước khi tạo hồ sơ nào; sai thì báo Lỗi, không tạo."""
+        bo_qua: set[str] = set()
+        for hs in self.ho_so:
+            if self.store.get(hs.key).trang_thai not in (TrangThai.CHO, TrangThai.LOI):
+                continue
+            try:
+                van_de = self.port.kiem_thua(hs)
+            except Exception as e:  # noqa: BLE001 — không quét được thì vẫn chạy như cũ, bước điền form tự kiểm diện tích
+                logger.warning(f"Không quét được thửa trên MPLIS: {type(e).__name__}: {str(e)[:150]}")
+                return
+            if van_de:
+                self.store.mark(hs.key, TrangThai.LOI, van_de)
+                self.emit(hs.key, "Lỗi", van_de, "")
+                bo_qua.add(hs.key)
+        self.ho_so = [hs for hs in self.ho_so if hs.key not in bo_qua]
+
+    def _quet_so_phat_hanh(self) -> None:
+        """Số phát hành đã cấp thì hỏi số mới trước khi tạo hồ sơ, để wizard không kẹt ở bước GCN với hồ sơ đã lưu."""
+        chua_tao = [i for i, hs in enumerate(self.ho_so)
+                    if hs.dau.thua.ma_phat_hanh and self.store.get(hs.key).trang_thai in (TrangThai.CHO, TrangThai.LOI)]
+        if not chua_tao:
+            return
+        da_cap = self._so_da_cap([self.ho_so[i].dau.thua.ma_phat_hanh for i in chua_tao])
+        bo_qua: set[str] = set()
+        for i in chua_tao:
+            hs = self.ho_so[i]
+            so = hs.dau.thua.ma_phat_hanh
+            trung = so in da_cap
+            while trung:
+                moi = self.port.hoi_so_moi(f"tờ {hs.dau.thua.so_to}, thửa {hs.dau.thua.so_thua}", so) if self.port.hoi_so_moi else None
+                if not moi:
+                    note = f'Cần kiểm tra lại số phát hành "{so}"'
+                    self.store.mark(hs.key, TrangThai.CAN_KIEM_TRA, note)
+                    self.emit(hs.key, "Cần kiểm tra", note, "")
+                    bo_qua.add(hs.key)
+                    break
+                so = chuan_ma_phat_hanh(moi)
+                trung = so in self._so_da_cap([so])
+            if not trung and so != hs.dau.thua.ma_phat_hanh:
+                self.ho_so[i] = _doi_so_phat_hanh(hs, so)
+        self.ho_so = [hs for hs in self.ho_so if hs.key not in bo_qua]  # đã báo Cần kiểm tra, không báo thêm "Bỏ qua"
 
     def mot_ho_so(self, hs: HoSo) -> None:
         bg = self.store.get(hs.key)
@@ -79,8 +140,15 @@ class Runner:
             return
 
         dang_do = bg.trang_thai in MOC_SAU_LUU
-        if dang_do and self.opts.dry_run:
+        if self.opts.dry_run and (dang_do or bg.trang_thai is TrangThai.DANG_TAO):  # DANG_TAO có thể đã có trên MPLIS
             self.emit(hs.key, "Bỏ qua", "Hồ sơ đã lưu dở trên MPLIS, chạy thử không đụng tới", bg.ma_ho_so)
+            return
+        thieu = [ten for ten, v in (("Số phát hành", hs.dau.thua.ma_phat_hanh), ("Diện tích xây dựng", hs.dau.nha.dt_xay_dung),
+                                    ("Diện tích sàn", hs.dau.nha.dt_san)) if not v]
+        if thieu and not self.opts.dry_run and bg.trang_thai in (TrangThai.CHO, TrangThai.LOI):
+            note = f"Thiếu {', '.join(thieu)}: wizard bắt buộc có nên không tạo hồ sơ"
+            self.store.mark(hs.key, TrangThai.LOI, note)
+            self.emit(hs.key, "Lỗi", note, "")
             return
 
         self.emit(hs.key, "Đang chạy", "", "")
@@ -101,7 +169,8 @@ class Runner:
                         self.store.mark(hs.key, TrangThai.DA_LUU, "Tìm lại được sau lần chạy bị ngắt", ma)
                         self._sau_luu(hs, ma, "Xác nhận sau lần chạy bị ngắt")
                     else:
-                        self.store.mark(hs.key, TrangThai.DA_CO_SAN, "Đã có trên MPLIS, không tạo mới", ma)
+                        if not self.opts.dry_run:  # chạy thử không ghi trạng thái
+                            self.store.mark(hs.key, TrangThai.DA_CO_SAN, "Đã có trên MPLIS, không tạo mới", ma)
                         self.emit(hs.key, "Đã có sẵn", "Tìm thấy hồ sơ trùng", ma)
                     self.port.trace_stop(hs.key, keep=False)
                     return
@@ -125,8 +194,8 @@ class Runner:
             self.port.trace_stop(hs.key, keep=False)
         except Exception as e:  # noqa: BLE001 — một hồ sơ lỗi không làm dừng cả lô
             trace = self.port.trace_stop(hs.key, keep=True)
-            msg = f"{type(e).__name__}: {str(e).splitlines()[0][:200] if str(e) else ''}"
-            if self.store.get(hs.key).trang_thai not in (TrangThai.DANG_TAO, TrangThai.CAN_KIEM_TRA, *MOC_SAU_LUU):
+            msg = che_so_trong_chu(f"{type(e).__name__}: {str(e).splitlines()[0][:200] if str(e) else ''}")
+            if not self.opts.dry_run and self.store.get(hs.key).trang_thai not in (TrangThai.DANG_TAO, TrangThai.CAN_KIEM_TRA, *MOC_SAU_LUU):
                 self.store.mark(hs.key, TrangThai.LOI, msg)
             logger.exception(f"{hs.mo_ta}: lỗi (trace: {trace})")
             self.emit(hs.key, "Lỗi", f"{msg}" + (f" · trace: {trace}" if trace else ""), "")
@@ -141,7 +210,7 @@ class Runner:
             self.store.mark(hs.key, TrangThai.DA_CHON_GCN, "Đã chọn GCN, chưa chuyển xử lý", ma)
         if self.store.get(hs.key).trang_thai is TrangThai.DA_CHON_GCN:
             nhan = self.port.chuyen_xu_ly(hs, ma)
-            if not self.opts.tai_khoan or nhan != self.opts.tai_khoan:
+            if not self.opts.tai_khoan or (nhan or "").strip().casefold() != self.opts.tai_khoan.strip().casefold():
                 note = f"Đã chuyển cho {nhan}"
                 self.store.mark(hs.key, TrangThai.DA_CHUYEN_NGUOI_KHAC, note, ma)
                 self.emit(hs.key, "Đã chuyển", note, ma)
@@ -153,6 +222,8 @@ class Runner:
             self.emit(hs.key, "Cần kiểm tra", note, ma)
             return
         try:
+            # ghi mốc trước khi vào wizard: bị tắt ngang thì lần sau chuyển người kiểm tra, không làm lại wizard từ đầu
+            self.store.mark(hs.key, TrangThai.DANG_HOAN_TAT, "Đang làm wizard, chưa Hoàn tất", ma)
             self.port.dien_chuyen_quyen(hs, ma)
             self.store.mark(hs.key, TrangThai.DANG_HOAN_TAT, "Đã điền wizard, sắp Hoàn tất", ma)
             self.port.hoan_tat(hs, ma)
@@ -163,14 +234,14 @@ class Runner:
             return
         except Exception as e:
             # wizard ghi dần lên máy chủ nên chạy lại có thể ghi lặp: để người kiểm tra
-            self.store.mark(hs.key, TrangThai.CAN_KIEM_TRA, f"Wizard dở: {str(e).splitlines()[0][:150]}", ma)
+            self.store.mark(hs.key, TrangThai.CAN_KIEM_TRA, che_so_trong_chu(f"Wizard dở: {str(e).splitlines()[0][:150]}"), ma)
             raise
         self._xac_nhan(hs, ma, note_ok)
 
     def _xac_nhan(self, hs: HoSo, ma: str, note_ok: str) -> None:
         lech = so_sanh(hs, self.port.doc(hs, ma))
         if lech:
-            note = "; ".join(f"{k}: web='{w}' excel='{x}'" for k, (w, x) in lech.items())
+            note = che_so_trong_chu("; ".join(f"{k}: web='{w}' excel='{x}'" for k, (w, x) in lech.items()))
             self.store.mark(hs.key, TrangThai.CAN_KIEM_TRA, note, ma)
             self.emit(hs.key, "Cần kiểm tra", note, ma)
         else:

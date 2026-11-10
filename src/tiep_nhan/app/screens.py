@@ -13,9 +13,10 @@ from typing import ContextManager
 from urllib.parse import urlsplit
 from zipfile import BadZipFile
 
+from loguru import logger
 from openpyxl.utils.exceptions import InvalidFileException
 from PySide6.QtCore import QSettings, QSize, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontMetrics, QGuiApplication, QIntValidator, QKeySequence, QPixmap, QShortcut
+from PySide6.QtGui import QColor, QDesktopServices, QFont, QGuiApplication, QIntValidator, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox, QCompleter, QFileDialog, QFrame,
                                QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget,
                                QListWidgetItem, QMenu, QPlainTextEdit, QProgressBar, QPushButton, QRadioButton, QScrollArea, QSizePolicy, QSplitter,
@@ -26,6 +27,7 @@ from .. import __version__
 from ..core.batch import Lo, nap_lo, xuat_ket_qua
 from ..core.runner import RunOptions
 from ..core.state import StateStore, TrangThai
+from ..domain.chuan_hoa import chuan_ma_phat_hanh, so_phat_hanh_hop_le
 from ..domain.danh_muc import DanhMuc
 from ..domain.gom_ho_so import CheDoGom
 from ..domain.models import HoSo
@@ -35,15 +37,16 @@ from ..infra.logging import che_cccd
 from ..mplis.locators import Locators
 from ..mplis.port import MplisPort
 from ..mplis.ui_adapter import PlaywrightMplis
-from .giao_dien import (CAM, CHE_DO, CHU, CHU_LOI, CHU_MO, CHU_NHAN, CHU_PHU, TRANG, NEN_APP, NEN_BAO_LOI, NEN_DANG_CHAY, NEN_KEO, NEN_THE, NEN_XU_LY_TAY, NHAN,
+from .giao_dien import (CAM, CHE_DO, CO_TIEU_DE_MAN, LIEN_KET, _font_tieu_de, CHU, CHU_LOI, CHU_MO, CHU_NHAN, CHU_PHU, TRANG, NEN_APP, NEN_BAO_LOI, NEN_DANG_CHAY, NEN_KEO, NEN_THE, NEN_XU_LY_TAY, NHAN,
                         TRANG_THAI, VAI_PHU, VIEN, VIEN_BAO_LOI, VIEN_KEO, VIEN_XU_LY_TAY, ChipLoc, DelegateDong, DelegateHaiDong, DelegateKetQua,
-                        DelegateO, DelegateTrangThai, HangSo, NhanTrangThai, NutChinh, NutChu, NutNguyHiem, NutPhu, O_TimKiem, The,
+                        DelegateO, DelegateTrangThai, HangSo, NhanRutGon, NhanTrangThai, NutChinh, NutChu, NutNguyHiem, NutPhu, O_TimKiem, The,
                         TheChiSo, bo_dau, che_so_giay_to, dat_thuoc_tinh, dat_tien_do, doan_ket_qua, font_so, hang_nut, hop_nhap, hop_thong_bao,
                         hop_xac_nhan, khop_tim, khung_man, ngay_gio, nhan_icon, rut_gon_ghi_chu, ten_ho_so, tep_trong_ghi_chu, ve_anh,
                         ve_icon)
 from .worker import Worker
 
 LO_MOI, KIEM_TRA, DANH_MUC, CHAY, KET_QUA, LICH_SU, CAI_DAT = range(7)
+TACH_TEN = " — "  # ô Người xử lý hiện "tài khoản — họ tên"
 
 KHOA = Qt.ItemDataRole.UserRole
 VAI_CHI_SO = Qt.ItemDataRole.UserRole + 2
@@ -151,6 +154,7 @@ def _o_nhan(nhan: str, w: QWidget, phu: QWidget | str = "") -> QVBoxLayout:
     if phu:
         if isinstance(phu, str):
             phu = _chu_phu(phu, xuong_dong=True)
+        lay.addSpacing(4)  # ghi chú cách ô ít nhất 8px, không chui dưới ô
         lay.addWidget(phu)
     return lay
 
@@ -175,7 +179,7 @@ def _ghi_chu_the(ten_icon: str, chu: str) -> The:
     hang.addWidget(nhan_icon(ten_icon, CHU_PHU), 0, Qt.AlignmentFlag.AlignTop)
     o = _chu_phu(chu, xuong_dong=True)
     hang.addWidget(o, 1)
-    return The(hang, dem=8, bong=False, nen=NEN_APP, vien=NEN_APP)
+    return The(hang, dem=8, nen=NEN_APP)
 
 
 def _nhom_phan(*ten: str) -> tuple[QFrame, list[QPushButton]]:
@@ -221,6 +225,42 @@ def _trang_thai_trong(ten_icon: str, chu: str, *nut: QWidget) -> QWidget:
     return w
 
 
+DANG_CHAY_KHONG_XOA = "Đang chạy một lô, chờ chạy xong rồi mới xoá được lịch sử."
+
+
+def _nut_xoa(bam: Callable[[], None], khoa: bool) -> QToolButton:
+    b = QToolButton()
+    b.setObjectName("tep")
+    b.setIcon(ve_icon("xoa", CHU_PHU, 16))
+    b.setFixedSize(30, 30)
+    b.setAccessibleName("Xoá khỏi lịch sử")
+    b.setToolTip(DANG_CHAY_KHONG_XOA if khoa else "Xoá khỏi lịch sử")
+    b.setEnabled(not khoa)
+    b.clicked.connect(bam)
+    return b
+
+
+def _xoa_lich_su(man: "ManHinh", ds: list[dict], tat_ca: bool = False) -> bool:
+    """Xoá bản ghi lịch sử lô sau khi người dùng xác nhận. Không đụng MPLIS, file Excel hay trạng thái hồ sơ."""
+    p = man.p
+    if p.dang_chay or not ds:
+        return False
+    ten = f"{len(ds)} lô" if tat_ca else Path(ds[0]["file"]).name
+    if not hop_xac_nhan(man, "Bạn có đồng ý xoá toàn bộ lịch sử?" if tat_ca else "Bạn có đồng ý xoá lô này?", "", [],
+                        "Xoá", kieu="nguy_hiem", nut_huy="Huỷ"):
+        return False
+    if tat_ca:
+        p.store.xoa_het_lo()
+    else:
+        for x in ds:
+            p.store.xoa_lo(x["id"])
+    logger.info(f"Xoá lịch sử: {ten} ({len(ds)} lần chạy)")
+    if p.file and any(Path(x["file"]) == p.file for x in ds):  # xoá đúng lô đang mở thì về Chưa chọn file
+        p.file, p.sheet, p.lo, p.ket_qua, p.can_chay, p.lan_chay, p.da_reset = None, None, None, {}, None, None, False
+    man.doi.emit()
+    return True
+
+
 class ManHinh(QWidget):
     TIEU_DE, MO_TA, BUOC = "", "", ""
     doi = Signal()  # dữ liệu đổi: cửa sổ chính vẽ lại thanh điều hướng và dải chế độ
@@ -256,7 +296,7 @@ class ManLoMoi(ManHinh):
         self.trang = QStackedWidget()
         self.trang.addWidget(self._trang_chua_co())
         self.trang.addWidget(self._trang_co_file())
-        self.vung = The(self.trang, dem=8, bong=False, nen=NEN_KEO, vien=VIEN_KEO, day=2, dut=True)
+        self.vung = The(self.trang, dem=14, nen=NEN_KEO, vien=VIEN_KEO, day=2, dut=True)
         self.sheet = QComboBox()
         self.che_do = QComboBox()
         self.che_do.addItem("Mỗi dòng một hồ sơ", CheDoGom.MOI_DONG)
@@ -267,6 +307,8 @@ class ManLoMoi(ManHinh):
         self.gan_day.setObjectName("ganDay")
         self.gan_day.setSpacing(0)
         self.gan_day.itemActivated.connect(lambda o: self.mo_file(Path(o.data(KHOA))))
+        self.gan_day.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.gan_day.customContextMenuRequested.connect(self._menu_gan_day)
         self.rong = _trang_thai_trong("dong_ho", "Chưa có lô nào. Lô bạn chạy sẽ hiện ở đây.")
         self.tiep = NutChinh("Kiểm tra dữ liệu →")
         self.tiep.setEnabled(False)
@@ -275,12 +317,12 @@ class ManLoMoi(ManHinh):
 
         luoi = QGridLayout()
         luoi.setHorizontalSpacing(16)
-        luoi.setVerticalSpacing(14)
+        luoi.setVerticalSpacing(18)
         luoi.addLayout(_o_nhan("Sheet", self.sheet), 0, 0)
         luoi.addLayout(_o_nhan("Chế độ gộp", self.che_do), 0, 1)
-        luoi.addLayout(_o_nhan("Người xử lý tác vụ tiếp theo", self.can_bo), 1, 0, 1, 2)
         ghi_chu = _ghi_chu_the("thong_tin", '<b>Người nộp</b> lấy từ cột "Người nộp" trong Excel; ô trống thì tra theo người nhận.')
-        the_lap = The(_tieu_de_the("Thiết lập lô"), luoi, ghi_chu)
+        luoi.addLayout(_o_nhan("Người xử lý tác vụ tiếp theo", self.can_bo, ghi_chu), 1, 0, 1, 2)
+        the_lap = The(_tieu_de_the("Thiết lập lô"), luoi)
         the_lap.layout().addStretch(1)
         xem_het = NutChu("Xem tất cả")
         xem_het.clicked.connect(lambda: self.di_toi(LICH_SU))
@@ -305,45 +347,64 @@ class ManLoMoi(ManHinh):
 
     def _trang_chua_co(self) -> QWidget:
         w = QWidget()
-        lay = QVBoxLayout(w)
-        lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lay.setSpacing(6)
-        lay.addWidget(nhan_icon("excel", NHAN, 48), 0, Qt.AlignmentFlag.AlignHCenter)
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(14)
+        lay.addWidget(nhan_icon("excel", NHAN, 32))
         to = QLabel("Kéo thả file phiếu chuyển (.xlsx) vào đây")
         to.setObjectName("tieuDeThe")
-        lay.addWidget(to, 0, Qt.AlignmentFlag.AlignHCenter)
-        lay.addWidget(_chu_phu("hoặc"), 0, Qt.AlignmentFlag.AlignHCenter)
-        lay.addWidget(self.nut_chon, 0, Qt.AlignmentFlag.AlignHCenter)
+        lay.addWidget(to)
+        lay.addWidget(_chu_phu("hoặc"))
+        lay.addWidget(self.nut_chon)
+        lay.addStretch(1)
         return w
 
     def _trang_co_file(self) -> QWidget:
         w = QWidget()
         lay = QHBoxLayout(w)
-        lay.setSpacing(16)
-        lay.addWidget(nhan_icon("excel", NHAN, 48))
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(14)
+        lay.addWidget(nhan_icon("excel", NHAN, 32))
         cot = QVBoxLayout()
-        cot.setSpacing(4)
-        cot.addStretch(1)
+        cot.setSpacing(0)
         self.ten_file = QLabel()
         self.ten_file.setObjectName("tieuDeThe")
-        self.ten_file.setWordWrap(True)
         self.nhan_doc = NhanTrangThai("Đọc được")
         hang = QHBoxLayout()
-        hang.addWidget(self.ten_file, 1)
+        hang.setSpacing(10)
+        hang.addWidget(self.ten_file)
         hang.addWidget(self.nhan_doc)
-        self.phu_file = _chu_phu(xuong_dong=True)
+        hang.addStretch(1)
+        self.phu_file = _chu_phu()
+        goi_y = _chu_phu("Kéo thả file .xlsx khác vào khung này để đổi.")
+        duoi = QHBoxLayout()  # số cột và gợi ý chung một dòng để khung chỉ cao bằng nửa trước
+        duoi.setSpacing(6)
+        duoi.addWidget(self.phu_file)
+        duoi.addWidget(_chu_phu("·"))
+        duoi.addWidget(goi_y)
+        duoi.addStretch(1)
         cot.addLayout(hang)
-        cot.addWidget(self.phu_file)
-        cot.addWidget(_chu_phu("Kéo thả file .xlsx khác vào khung này để đổi."))
-        cot.addStretch(1)
+        cot.addLayout(duoi)
         lay.addLayout(cot, 1)
         lay.addWidget(self.nut_khac)
         return w
 
     def hien(self) -> None:
+        if self.p.file is None:  # lô đang mở vừa bị xoá khỏi lịch sử
+            self.trang.setCurrentIndex(0)
+            self.sheet.clear()
+            self.tiep.setEnabled(False)
+            self.tiep.setToolTip("Chọn file Excel trước")
         hien_tai = self.can_bo.currentText()
         self.can_bo.clear()
-        self.can_bo.addItems(self.p.settings.ds_can_bo)
+        danh_ba = self.p.settings.danh_ba_can_bo
+        gan_day = self.p.settings.ds_can_bo  # dùng gần đây lên đầu, sau đó toàn bộ danh sách lấy từ MPLIS
+        ds = gan_day + sorted((u for u in danh_ba if u not in gan_day), key=lambda u: bo_dau(danh_ba[u] or u))
+        self.can_bo.addItems([f"{u}{TACH_TEN}{danh_ba[u]}" if danh_ba.get(u) else u for u in ds])
+        goi_y = QCompleter(self.can_bo.model(), self.can_bo)
+        goi_y.setFilterMode(Qt.MatchFlag.MatchContains)
+        goi_y.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self.can_bo.setCompleter(goi_y)
         if hien_tai:
             self.can_bo.setCurrentText(hien_tai)
         self.gan_day.clear()
@@ -353,6 +414,7 @@ class ManLoMoi(ManHinh):
         for x in list(theo_file.values())[:5]:
             o = QListWidgetItem()
             o.setData(KHOA, x["file"])
+            o.setData(VAI_CHI_SO, x["id"])
             the = self._the_lo(x)
             o.setSizeHint(QSize(0, the.sizeHint().height()))
             self.gan_day.addItem(o)
@@ -360,19 +422,52 @@ class ManLoMoi(ManHinh):
         co = self.gan_day.count() > 0
         self.gan_day.setVisible(co)
         self.rong.setVisible(not co)
+        self._chinh_cao_gan_day()
+
+    def _chinh_cao_gan_day(self) -> None:
+        """Chiều cao từng thẻ tính theo bề rộng thật, để dòng thống kê xuống dòng mà không dư khoảng trống."""
+        rong = self.gan_day.viewport().width()
+        for i in range(self.gan_day.count()):
+            o = self.gan_day.item(i)
+            the = self.gan_day.itemWidget(o)
+            if the is not None and rong > 50:
+                o.setSizeHint(QSize(0, the.heightForWidth(rong) if the.hasHeightForWidth() else the.sizeHint().height()))
+
+    def resizeEvent(self, e) -> None:
+        super().resizeEvent(e)
+        self._chinh_cao_gan_day()
 
     def _the_lo(self, x: dict) -> The:
-        ten = QLabel()
+        ten = NhanRutGon(Path(x["file"]).name)
         ten.setObjectName("tieuDeThe")
-        goc = Path(x["file"]).name
-        ten.setText(QFontMetrics(ten.font()).elidedText(goc, Qt.TextElideMode.ElideMiddle, 200))
-        ten.setToolTip(goc)
         hang = QHBoxLayout()
+        hang.setSpacing(8)
         hang.addWidget(ten, 1)
         hang.addWidget(NhanTrangThai(x["che_do"], cham=False))
-        tt = x["tom_tat"].lower()
-        phu = _chu_phu(f"{ngay_gio(x['thoi_gian'])} · {x['so_ho_so']} hồ sơ · {tt}", xuong_dong=True)
-        return The(hang, phu, dem=4, bong=False)
+        hang.addWidget(_nut_xoa(lambda: self.xoa_gan_day(x["id"]), self.p.dang_chay))
+        tt = html.escape(x["tom_tat"].lower())
+        phu = _chu_phu(f'<div style="line-height:140%">{ngay_gio(x["thoi_gian"])} · {x["so_ho_so"]} hồ sơ · {tt}</div>', xuong_dong=True)
+        phu.setTextFormat(Qt.TextFormat.RichText)
+        the = The(hang, phu, dem=8, nen=NEN_APP)
+        the.layout().setSpacing(6)
+        return the
+
+    def _menu_gan_day(self, vi_tri) -> None:
+        o = self.gan_day.itemAt(vi_tri)
+        if not o:
+            return
+        m = QMenu(self)
+        m.addAction("Mở lại", lambda: self.mo_file(Path(o.data(KHOA))))
+        a = m.addAction(ve_icon("xoa", CHU_PHU), "Xoá", lambda: self.xoa_gan_day(o.data(VAI_CHI_SO)))
+        a.setEnabled(not self.p.dang_chay)
+        m.exec(self.gan_day.viewport().mapToGlobal(vi_tri))
+
+    def xoa_gan_day(self, id_: int) -> None:
+        """Thẻ gộp mọi lần chạy của một file, nên xoá thẻ là xoá hết các lần chạy đó (không thì lần cũ hơn lại hiện lên)."""
+        ds = self.p.store.ds_lo()
+        x = next((r for r in ds if r["id"] == id_), None)
+        if x and _xoa_lich_su(self, [r for r in ds if r["file"] == x["file"]]):
+            self.hien()
 
     def _hop_le(self, e) -> list[Path]:
         return [Path(u.toLocalFile()) for u in e.mimeData().urls() if u.toLocalFile().lower().endswith((".xlsx", ".xlsm"))]
@@ -380,13 +475,13 @@ class ManLoMoi(ManHinh):
     def dragEnterEvent(self, e) -> None:
         if self._hop_le(e):
             e.acceptProposedAction()
-            self.vung.dat(vien=NHAN)
+            self.vung.dat(vien=CHU, dut=False)
 
     def dragLeaveEvent(self, e) -> None:
-        self.vung.dat(vien=VIEN_KEO)
+        self.vung.dat(vien=VIEN_KEO, dut=True)
 
     def dropEvent(self, e) -> None:
-        self.vung.dat(vien=VIEN_KEO)
+        self.vung.dat(vien=VIEN_KEO, dut=True)
         self.mo_file(self._hop_le(e)[0])
 
     def _chon(self) -> None:
@@ -406,6 +501,8 @@ class ManLoMoi(ManHinh):
         self.tiep.setToolTip("Chọn file Excel trước")
 
     def mo_file(self, f: Path) -> None:
+        if self.p.dang_chay:  # đổi file giữa lúc chạy làm lịch sử ghi nhầm tên lô và mất kết quả
+            return
         try:
             ds = ten_sheet(f)
         except (OSError, BadZipFile, InvalidFileException, KeyError) as e:
@@ -436,7 +533,10 @@ class ManLoMoi(ManHinh):
 
     def _sang_kiem_tra(self) -> None:
         p = self.p
-        p.sheet, p.che_do, p.can_bo = self.sheet.currentText(), CheDoGom(self.che_do.currentData()), self.can_bo.currentText().strip()
+        if p.dang_chay:
+            return
+        p.sheet, p.che_do = self.sheet.currentText(), CheDoGom(self.che_do.currentData())
+        p.can_bo = self.can_bo.currentText().split(TACH_TEN)[0].strip()  # chỉ tài khoản; họ tên chỉ để dễ tìm
         if p.can_bo:
             p.settings.ds_can_bo = [p.can_bo] + [x for x in p.settings.ds_can_bo if x != p.can_bo]
             p.settings.save()
@@ -461,7 +561,7 @@ class ManKiemTra(ManHinh):
 
         self.chu_loi = QLabel()
         self.chu_loi.setWordWrap(True)
-        doc_lai = NutNguyHiem("Đọc lại file", ve_icon("doc_lai", CHU_LOI))
+        doc_lai = NutNguyHiem("Đọc lại file", ve_icon("doc_lai", CHU_PHU))
         doc_lai.clicked.connect(self._doc_lai)
         hang = QHBoxLayout()
         hang.setSpacing(12)
@@ -587,7 +687,7 @@ class ManKiemTra(ManHinh):
             so = "Cả file" if dong == [0] else f"1 dòng: {dong[0]}" if len(ds) == 1 else f"{len(ds)} lần"
             g = QTreeWidgetItem([ma, muc, so, "Chọn dòng"])
             g.setFont(0, font_so(13, QFont.Weight.DemiBold))
-            g.setForeground(3, QColor(NHAN))
+            g.setForeground(3, QColor(LIEN_KET))
             g.setData(0, KHOA, ma)
             for v in ds:
                 g.addChild(QTreeWidgetItem([f"Dòng {v.excel_row}: {che_so_giay_to(v.noi_dung)}"]))
@@ -651,7 +751,7 @@ class ManKiemTra(ManHinh):
         hang = [("Địa chỉ", e(d.thua.dia_chi or "") or chua_co), ("Diện tích", dt), ("Số phát hành", e(d.thua.ma_phat_hanh or "") or chua_co),
                 ("Cán bộ XL", e(d.can_bo or "") or chua_co), ("Người nộp", e(d.nguoi_nop.ho_ten))]
         o = "".join(f'<tr><td width="110" style="color:{CHU_PHU};padding:3px 0">{a}</td><td style="padding:3px 0">{b}</td></tr>' for a, b in hang)
-        nhan = f'<div style="color:{CHU_NHAN};font-size:11px;font-weight:600;margin-top:14px">%s</div>'
+        nhan = f'<div style="color:{CHU_NHAN};font-size:12px;font-weight:600;margin-top:14px">%s</div>'
         nguoi = "".join(f'<div style="margin-top:4px"><b>{e(n.ho_ten)}</b> · Sinh {n.nam_sinh or "—"} · CCCD {che_cccd(n.cccd)}</div>' for n in d.nguoi)
         gop: dict[tuple[str, str], list[str]] = {}
         for v in self.van_de_theo_khoa.get(khoa, []):
@@ -662,7 +762,7 @@ class ManKiemTra(ManHinh):
             lan = f" · {len(ds)} lần" if len(ds) > 1 else ""
             vd += f'<div style="margin-top:6px"><b style="color:{mau}">{e(ma)}</b> {e("; ".join(dict.fromkeys(ds)))}{lan}</div>'
         self.xem.setHtml(f'<div style="color:{CHU_PHU};font-size:12px">Dòng {d.excel_row} trong Excel</div>'
-                         f'<div style="font-size:18px;font-weight:700">Tờ {d.thua.so_to}, thửa {d.thua.so_thua}</div>'
+                         f'<div style="font-size:18px;font-weight:500">Tờ {d.thua.so_to}, thửa {d.thua.so_thua}</div>'
                          f'<table cellspacing="0" style="margin-top:8px">{o}</table>'
                          f'{nhan % "NGƯỜI NHẬN"}{nguoi}' + (f'{nhan % "VẤN ĐỀ CỦA HỒ SƠ NÀY"}{vd}' if vd else ""))
 
@@ -768,7 +868,7 @@ class ManDanhMuc(ManHinh):
             self.bang.setItem(r, 0, ten)
             self.bang.setItem(r, 1, QTableWidgetItem(gv))
             so = QTableWidgetItem(str(len(thieu[(b, gv)])))
-            so.setForeground(QColor(NHAN))
+            so.setForeground(QColor(LIEN_KET))
             so.setToolTip(self._ds_ho_so(thieu[(b, gv)]))
             self.bang.setItem(r, 2, so)
             self.bang.setCellWidget(r, 3, self._combo(self.p.dm.bang(b)))
@@ -813,6 +913,8 @@ class ManDanhMuc(ManHinh):
             self.bang.setRowHidden(r, self.chip_chua.isChecked() and self._da_chon(r))
 
     def luu(self) -> None:
+        if self.p.dang_chay:
+            return
         them = [(b, gv, self.bang.cellWidget(r, 3).currentText().strip()) for r, (b, gv) in enumerate(self.dong)]
         them = [x for x in them if x[2] and x[2] != "TODO"]
         if not them:
@@ -833,7 +935,7 @@ class _TheCheDo(The):
 
     def __init__(self, nut: QRadioButton, che_do: str, mo_ta: str):
         self.nut, self.cd = nut, CHE_DO[che_do]
-        nut.setStyleSheet(f"QRadioButton {{ color: {self.cd['chu']}; font-size: 15px; font-weight: 600; }}")
+        nut.setStyleSheet(f"QRadioButton {{ color: {self.cd['chu']}; font-size: 18px; font-weight: 500; }}")
         phu = _chu_phu(mo_ta, xuong_dong=True)
         phu.setIndent(32)
         super().__init__(nut, phu, dem=10)
@@ -877,7 +979,7 @@ class ManChay(ManHinh):
         chon.addWidget(self.the_that, 1)
 
         self.so_lon = QLabel("0")
-        self.so_lon.setStyleSheet("font-size: 28px; font-weight: 700;")
+        self.so_lon.setFont(_font_tieu_de(CO_TIEU_DE_MAN))
         self.tren_so = _chu_phu("/ 0 hồ sơ")
         self.dang_chu = QLabel("Sẵn sàng")
         self.dang_chu.setStyleSheet("font-weight: 600;")
@@ -1047,6 +1149,7 @@ class ManChay(ManHinh):
         self.worker = Worker(ho_so, p.store, p.tao_port, opts)
         self.worker.event.connect(self._su_kien)
         self.worker.hoi_so.connect(self._hoi_so)
+        self.worker.danh_ba.connect(self._luu_danh_ba)
         self.worker.finished.connect(self._xong)
         p.dang_chay, p.che_do_chay, p.tien_do = True, self.che_do_chon(), (0, len(ho_so))
         self.t_dau = time.monotonic()
@@ -1057,6 +1160,10 @@ class ManChay(ManHinh):
         self.gio.start()
         self.doi.emit()
         self.worker.start()
+
+    def _luu_danh_ba(self, ds: dict) -> None:
+        self.p.settings.danh_ba_can_bo.update(ds)
+        self.p.settings.save()
 
     def _dung(self) -> None:
         self.worker.stop()
@@ -1131,7 +1238,9 @@ class ManChay(ManHinh):
         moi = hop_nhap(self, "MPLIS báo trùng số phát hành",
                        f'<b>{html.escape(ten)}</b><br>Số đang dùng: <span style="color:{CHU_LOI};text-decoration:line-through">{html.escape(so)}</span>',
                        "Số phát hành mới", goi_y="Bỏ qua thì hồ sơ được ghi là Cần kiểm tra, tool chạy tiếp hồ sơ sau.",
-                       nut_dong_y="Dùng số mới", nut_bo_qua="Bỏ qua hồ sơ này")
+                       nut_dong_y="Dùng số mới", nut_bo_qua="Bỏ qua hồ sơ này", hop_le=so_phat_hanh_hop_le,
+                       bao_sai="Số phát hành gồm 2 chữ cái và 8 chữ số, ví dụ AA 12345678.")
+        moi = chuan_ma_phat_hanh(moi) if moi and so_phat_hanh_hop_le(moi) else None  # số sai dạng không bao giờ được gửi đi
         self.worker.tra_loi(moi or "")
 
     def _xem_anh(self) -> None:
@@ -1440,9 +1549,7 @@ class ManKetQua(ManHinh):
         m.addAction("Mở trace", lambda: _mo(trace)).setEnabled(bool(trace))
 
         def chay_lai_dong() -> None:
-            t.clearSelection()
-            t.selectRow(r)
-            self.chay_lai()
+            self.chay_lai([khoa])  # chỉ hồ sơ này, không gộp các dòng đang tích
 
         m.addAction("Chạy lại hồ sơ này", chay_lai_dong).setEnabled(self.p.ket_qua[khoa][0] in CAN_XU_LY)
         m.exec(t.viewport().mapToGlobal(vi_tri))
@@ -1460,25 +1567,29 @@ class ManKetQua(ManHinh):
         self.the_xuat.show()
         self.gio_xuat.start()
 
-    def chay_lai(self) -> None:
+    def chay_lai(self, khoa: list[str] | None = None) -> None:
         p = self.p
-        chon = self._chon()
+        chon = khoa if khoa is not None else self._chon()
         loi = [k for k in chon if p.ket_qua[k][0] in CAN_XU_LY]
-        chon = [k for k in loi if not p.store.get(k).ma_ho_so]  # tra trùng sẽ gặp chính nó và báo "Đã có sẵn", che mất phần dở
-        if len(chon) < len(loi):
-            hop_thong_bao(self, "Chạy lại", f"{len(loi) - len(chon)} hồ sơ đã có mã trên MPLIS, không làm lại từ đầu được. "
+        # DANG_TAO có thể đã tạo trên MPLIS: giữ nguyên trạng thái để Runner bắt buộc tra trùng, không xoá về CHO
+        dang_tao = [k for k in loi if p.store.get(k).trang_thai is TrangThai.DANG_TAO]
+        chon = [k for k in loi if not p.store.get(k).ma_ho_so and k not in dang_tao]  # có mã: tra trùng gặp chính nó, che mất phần dở
+        if len(chon) + len(dang_tao) < len(loi):
+            hop_thong_bao(self, "Chạy lại", f"{len(loi) - len(chon) - len(dang_tao)} hồ sơ đã có mã trên MPLIS, không làm lại từ đầu được. "
                                             "Hãy xử lý tiếp các hồ sơ này trên MPLIS.", "canh_bao")
         if not loi:
             hop_thong_bao(self, "Chạy lại", 'Chọn ít nhất một dòng "Lỗi" hoặc "Cần kiểm tra".')
-        if not chon:
+        tat_ca = chon + dang_tao
+        if not tat_ca:
             return
-        if not hop_xac_nhan(self, "Chạy lại", f"Làm lại {len(chon)} hồ sơ đã chọn? Tool sẽ tra trùng trên MPLIS trước.", [],
-                            f"Làm lại {len(chon)} hồ sơ"):
+        if not hop_xac_nhan(self, "Chạy lại", f"Làm lại {len(tat_ca)} hồ sơ đã chọn? Tool sẽ tra trùng trên MPLIS trước.", [],
+                            f"Làm lại {len(tat_ca)} hồ sơ"):
             return
         for k in chon:
             p.store.reset(k)
+        for k in tat_ca:
             p.ket_qua.pop(k, None)
-        p.can_chay, p.da_reset = [hs for hs in p.lo.ho_so if hs.key in chon], True
+        p.can_chay, p.da_reset = [hs for hs in p.lo.ho_so if hs.key in tat_ca], True
         self.di_toi(CHAY)
 
 
@@ -1506,7 +1617,11 @@ class ManLichSu(ManHinh):
         cong_cu.setSpacing(12)
         cong_cu.addWidget(self.tim, 1)
         cong_cu.addWidget(khung)
-        self.bang = _bang("Thời gian", "File", "Chế độ", "Số hồ sơ", "Kết quả")
+        self.bang = _bang("Thời gian", "File", "Chế độ", "Số hồ sơ", "Kết quả", "", rong=1)
+        self.bang.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self.bang.setColumnWidth(4, 240)
+        self.bang.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
+        self.bang.setColumnWidth(5, 52)
         self.bang.setItemDelegateForColumn(0, DelegateHaiDong(self.bang, ngang=True))
         self.bang.setItemDelegateForColumn(2, DelegateTrangThai(self.bang))
         self.bang.setItemDelegateForColumn(4, DelegateKetQua(self.bang))
@@ -1522,13 +1637,15 @@ class ManLichSu(ManHinh):
         self.rong = _trang_thai_trong("dong_ho", "Chưa có lô nào được chạy.", moi, xoa)
         self.nut_moi, self.nut_xoa = moi, xoa
         self.tong_ket = _chu_phu()
+        self.nut_xoa_het = NutNguyHiem("Xoá toàn bộ lịch sử", ve_icon("xoa", CHU_PHU))
+        self.nut_xoa_het.clicked.connect(self.xoa_het)
         self.nut_tiep, self.nut_mo = NutPhu("Chạy tiếp lô này"), NutChinh("Mở kết quả")
         self.nut_tiep.clicked.connect(lambda: self.mo(CHAY))
         self.nut_mo.clicked.connect(lambda: self.mo(KET_QUA))
         lay = self.goc
         lay.addLayout(cong_cu)
         lay.addWidget(The(self.bang, self.rong, self.tong_ket, dem=8), 1)
-        hang_nut(lay, self.nut_tiep, self.nut_mo, trai=(_chu_phu("Bấm đúp một dòng để mở kết quả"),))
+        hang_nut(lay, self.nut_tiep, self.nut_mo, trai=(self.nut_xoa_het, _chu_phu("Bấm đúp một dòng để mở kết quả")))
         self.phim("Ctrl+F", self.tim.setFocus)
         self.phim("Esc", self.tim.clear, self.tim)
 
@@ -1554,6 +1671,11 @@ class ManLichSu(ManHinh):
             so.setData(Qt.ItemDataRole.DisplayRole, x["so_ho_so"])
             t.setItem(r, 3, so)
             t.setItem(r, 4, QTableWidgetItem(x["tom_tat"]))
+            o_xoa = QWidget()
+            hang_xoa = QHBoxLayout(o_xoa)
+            hang_xoa.setContentsMargins(4, 0, 8, 0)
+            hang_xoa.addWidget(_nut_xoa(lambda _c=False, id_=x["id"]: self._xoa_id(id_), self.p.dang_chay))
+            t.setCellWidget(r, 5, o_xoa)
         t.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         t.setSortingEnabled(True)
         co = bool(self.ds)
@@ -1567,7 +1689,22 @@ class ManLichSu(ManHinh):
         ho_so = sum(x["so_ho_so"] for x in self.ds)
         tc = sum(n for x in self.ds for n, ten in doan_ket_qua(x["tom_tat"]) if ten == "Thành công")
         self.tong_ket.setText(f"{len(self.ds)} lô · {ho_so} hồ sơ · {tc} thành công")
+        self.nut_xoa_het.setEnabled(co_lo and not self.p.dang_chay)
+        self.nut_xoa_het.setToolTip(DANG_CHAY_KHONG_XOA if self.p.dang_chay else "")
         self._cap_nhat_nut()
+
+    def _xoa_id(self, id_: int) -> None:
+        x = next((r for r in self.ds if r["id"] == id_), None)
+        if x and _xoa_lich_su(self, [x]):
+            self.hien()
+
+    def xoa_dong(self, r: int) -> None:
+        if 0 <= r < self.bang.rowCount():
+            self._xoa_id(self.ds[self.bang.item(r, 0).data(VAI_CHI_SO)]["id"])
+
+    def xoa_het(self) -> None:
+        if _xoa_lich_su(self, self.p.store.ds_lo(), tat_ca=True):
+            self.hien()
 
     def _dong(self) -> dict | None:
         r = self.bang.currentRow()
@@ -1588,12 +1725,15 @@ class ManLichSu(ManHinh):
         m.addAction("Chạy tiếp", lambda: self.mo(CHAY)).setEnabled(self.nut_tiep.isEnabled())
         m.addAction("Mở file Excel gốc", lambda: _mo(x["file"])).setEnabled(Path(x["file"]).exists())
         m.addAction("Mở thư mục log của lô", lambda: _mo(LOG_DIR))
+        m.addSeparator()
+        m.addAction(ve_icon("xoa", CHU_PHU), "Xoá", lambda: self._xoa_id(x["id"])).setEnabled(not self.p.dang_chay)
         m.exec(self.bang.viewport().mapToGlobal(vi_tri))
 
     def mo(self, man: int) -> None:
         x, p = self._dong(), self.p
-        if not x:
+        if not x or p.dang_chay:
             return
+        p.can_chay, p.da_reset = None, False  # danh sách chạy lại của lô trước không áp sang lô này
         f = Path(x["file"])
         if not f.exists():
             hop_thong_bao(self, "Không thấy file", str(f), "canh_bao")

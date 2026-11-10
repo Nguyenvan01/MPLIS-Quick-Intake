@@ -30,6 +30,13 @@ def resource_dir() -> Path:
     return Path(__file__).resolve().parents[3] / "config"
 
 
+def assets_dir() -> Path:
+    """Thư mục assets/ (font...) đi kèm bản cài hoặc trong repo khi dev."""
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / "assets"  # type: ignore[attr-defined]
+    return Path(__file__).resolve().parents[3] / "assets"
+
+
 def config_file(name: str) -> Path:
     """Ưu tiên bản người dùng đã sửa trong %APPDATA%, không có thì dùng bản mặc định."""
     user = app_dir() / name
@@ -57,6 +64,7 @@ class Settings:
     nguoi_ky: str = "Phạm Ngọc Trường"
     ds_can_bo: list[str] = field(default_factory=lambda: ["ltmung.nnmt", "ndanh.tnmt"])  # combobox người xử lý
     thoi_han_mac_dinh: str = "Lâu dài"    # dùng khi Excel không có cột/ô Thời hạn
+    danh_ba_can_bo: dict[str, str] = field(default_factory=dict)  # tài khoản -> họ tên người xử lý, tool tự lấy từ MPLIS
 
     @classmethod
     def load(cls) -> "Settings":

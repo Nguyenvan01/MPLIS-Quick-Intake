@@ -32,3 +32,8 @@ def setup() -> None:
 
 def che_cccd(cccd: str | None) -> str:
     return f"{cccd[:4]}•••{cccd[-3:]}" if cccd and len(cccd) >= 8 else "—"
+
+
+def che_so_trong_chu(chu: str) -> str:
+    """Che mọi dãy 12 chữ số (CCCD) trong một đoạn chữ, ví dụ ghi chú hay nội dung lỗi trước khi lưu, hiện, xuất."""
+    return re.sub(r"(?<!\d)\d{12}(?!\d)", lambda m: che_cccd(m[0]), chu or "")

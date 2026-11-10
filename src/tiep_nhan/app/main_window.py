@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QListWidget, Q
 
 from .. import __version__
 from . import screens as S
-from .giao_dien import (CHE_DO, CHU, CHU_NHAN, CHU_PHU, NEN_CHON, NHAN, TRANG_THAI, VIEN, VIEN_O, VONG_FOCUS, DaiCheDo, The, _font,
+from .giao_dien import (NEN_CHON, NEN_RE, TRANG, CHE_DO, CHU, CHU_NHAN, CHU_PHU, NHAN, TRANG_THAI, VIEN, VIEN_O, VONG_FOCUS, DaiCheDo, The, _font, _font_tieu_de,
                         ap_giao_dien, chuyen_canh, co_hieu_ung, hop_thong_bao, ve_anh)
 from .screens import MAN_HINH, Phien, phien_mac_dinh
 
@@ -29,11 +29,11 @@ def _logo() -> QPixmap:
     p.setPen(Qt.PenStyle.NoPen)
     p.setBrush(QColor(NHAN))
     p.drawRoundedRect(QRectF(0, 0, 34, 34), 10, 10)
-    p.setPen(QPen(QColor("#FFFFFF"), 2.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+    p.setPen(QPen(QColor(TRANG), 2.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
     for y, dai in ((11, 15), (17, 15), (23, 9)):
         p.drawLine(QPointF(9, y), QPointF(9 + dai, y))
     p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor("#7FD1C3"))
+    p.setBrush(QColor(TRANG))
     p.drawEllipse(QPointF(24, 23), 3, 3)
     p.end()
     return pm
@@ -55,11 +55,11 @@ class _DelegateNav(QStyledItemDelegate):
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(NHAN))
             p.drawEllipse(tam, 11, 11)
-            p.drawPixmap(QRectF(tam.x() - 7, tam.y() - 7, 14, 14), ve_anh("xong", "#FFFFFF", 14), QRectF(0, 0, 28, 28))
+            p.drawPixmap(QRectF(tam.x() - 7, tam.y() - 7, 14, 14), ve_anh("xong", TRANG, 14), QRectF(0, 0, 28, 28))
             return
         mo = trang_thai == "mo"
         p.setPen(QPen(QColor(NHAN if mo else VIEN_O), 2 if mo else 1.5))
-        p.setBrush(QColor("#FFFFFF"))
+        p.setBrush(QColor(TRANG))
         p.drawEllipse(tam, 10, 10)
         p.setPen(QColor(NHAN if mo else CHU_NHAN))
         p.setFont(_font(12, QFont.Weight.DemiBold))
@@ -87,7 +87,7 @@ class _DelegateNav(QStyledItemDelegate):
             p.setBrush(QColor(NEN_CHON))
             p.drawRoundedRect(QRectF(khung), 10, 10)
         elif o.state & QStyle.StateFlag.State_MouseOver:
-            p.setBrush(QColor("#F7F8FA"))
+            p.setBrush(QColor(NEN_RE))
             p.drawRoundedRect(QRectF(khung), 10, 10)
         if o.state & QStyle.StateFlag.State_HasFocus and o.state & QStyle.StateFlag.State_KeyboardFocusChange:
             p.setPen(QPen(QColor(VONG_FOCUS), 2))
@@ -103,7 +103,7 @@ class _DelegateNav(QStyledItemDelegate):
         phai = khung.right() - 8
         if huy_hieu:
             chu, nen, mau = huy_hieu
-            p.setFont(_font(11, QFont.Weight.DemiBold))
+            p.setFont(_font(12, QFont.Weight.DemiBold))
             rong = p.fontMetrics().horizontalAdvance(chu) + 14
             o_hh = QRectF(phai - rong, khung.center().y() - 9, rong, 18)
             p.setPen(Qt.PenStyle.NoPen)
@@ -112,7 +112,7 @@ class _DelegateNav(QStyledItemDelegate):
             p.setPen(QColor(mau))
             p.drawText(o_hh, Qt.AlignmentFlag.AlignCenter, chu)
             phai -= int(rong) + 6
-        p.setFont(_font(14, QFont.Weight.Bold if chon else QFont.Weight.Normal))
+        p.setFont(_font(14, QFont.Weight.DemiBold if chon else QFont.Weight.Normal))
         p.setPen(QColor(NHAN if chon else CHU))
         chu_r = QRect(khung.x() + 42, khung.y(), phai - khung.x() - 42, khung.height())
         p.drawText(chu_r, Qt.AlignmentFlag.AlignVCenter, p.fontMetrics().elidedText(i.data(), Qt.TextElideMode.ElideRight, chu_r.width()))
@@ -173,14 +173,10 @@ class MainWindow(QMainWindow):
         logo = QLabel()
         logo.setPixmap(_logo())
         ten = QLabel("Tiếp nhận hồ sơ")
-        ten.setFont(_font(14, QFont.Weight.Bold))
-        phu = QLabel("Nhập phiếu chuyển lên MPLIS")
-        phu.setObjectName("phu")
-        phu.setFont(_font(11))
+        ten.setFont(_font_tieu_de(14))
         cot = QVBoxLayout()
         cot.setSpacing(0)
         cot.addWidget(ten)
-        cot.addWidget(phu)
         hieu = QHBoxLayout()
         hieu.setContentsMargins(4, 0, 0, 16)
         hieu.setSpacing(10)
@@ -188,13 +184,13 @@ class MainWindow(QMainWindow):
         hieu.addLayout(cot, 1)
         nhom = QLabel("CÁC BƯỚC CỦA LÔ")
         nhom.setObjectName("nhanNhom")
-        f = _font(11, QFont.Weight.DemiBold)
+        f = _font(12, QFont.Weight.DemiBold)
         f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 0.6)
         nhom.setFont(f)
         nhom.setContentsMargins(8, 0, 0, 6)
         self.lo_tieu_de, self.lo_chi_tiet = QLabel(), QLabel()
         self.lo_tieu_de.setObjectName("nhanNhom")
-        self.lo_tieu_de.setFont(_font(11, QFont.Weight.DemiBold))
+        self.lo_tieu_de.setFont(_font(12, QFont.Weight.DemiBold))
         self.lo_chi_tiet.setObjectName("phu")
         self.lo_chi_tiet.setFont(_font(12))
         self.lo_chi_tiet.setWordWrap(True)
@@ -220,7 +216,7 @@ class MainWindow(QMainWindow):
             hh[1] = (f"{so_loi} lỗi", do[1], do[0])
         if thieu:
             hh[2] = (f"còn {len(thieu)}", cam[1], cam[0])
-        if p.dang_chay and p.tien_do:
+        if p.dang_chay and p.tien_do and p.che_do_chay:
             cd = CHE_DO[p.che_do_chay]
             hh[3] = (f"{p.tien_do[0]}/{p.tien_do[1]}", cd["nen_nhan"], cd["chu_nhan"])
         tay = sum(1 for v in p.ket_qua.values() if v[0] in S.CAN_XU_LY)
@@ -231,7 +227,7 @@ class MainWindow(QMainWindow):
         dang_o_chay = self.stack.currentIndex() == S.CHAY
         self.dai.dat(p.che_do_chay or (self.man[S.CHAY].che_do_chon() if dang_o_chay else None))
         self.setWindowTitle((DAU_CHAY_THAT if p.che_do_chay == "that" else "") + TIEU_DE)
-        if p.dang_chay:
+        if p.dang_chay and p.che_do_chay:
             cd = CHE_DO[p.che_do_chay]
             self.lo_tieu_de.setText("Đang ở chế độ")
             self.lo_chi_tiet.setText(f'<b style="color:{cd["chu"]}">{cd["ten"]}</b>')

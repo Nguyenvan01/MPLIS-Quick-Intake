@@ -36,6 +36,17 @@ def _nap(w, f):
     w.man[S.LO_MOI].mo_file(f)
     w.man[S.LO_MOI].can_bo.setCurrentText("ndanh.tnmt")
     w.man[S.LO_MOI]._sang_kiem_tra()
+    _du_so(w)
+
+
+def _du_so(w):
+    """Chạy thật bắt buộc có số phát hành; file mẫu cố ý để trống ở vài dòng nên điền bổ sung sau mỗi lần nạp lô."""
+    w.phien.lo.ho_so = [h if h.dau.thua.ma_phat_hanh else _voi_so(h, f"AA {i:08d}") for i, h in enumerate(w.phien.lo.ho_so, 1)]
+
+
+def _voi_so(hs, so):
+    d = hs.dong[0]
+    return hs.model_copy(update={"dong": (d.model_copy(update={"thua": d.thua.model_copy(update={"ma_phat_hanh": so})}),) + hs.dong[1:]})
 
 
 def _chay(w, qtbot, that: bool = False):
@@ -82,6 +93,7 @@ def _het_loi(w):
     for r in range(m.bang.rowCount()):
         m.bang.cellWidget(r, 3).setCurrentText("Giá trị A")
     m.luu()
+    _du_so(w)
 
 
 def test_chay_thu_khong_luu_roi_co_ket_qua_va_lich_su(cua_so, mau, qtbot):
@@ -146,8 +158,8 @@ def _chay_that(w, qtbot, monkeypatch, tra_loi):
 
 def test_trung_so_thi_hoi_so_moi_va_di_tiep(cua_so, mau, qtbot, monkeypatch):
     _nap(cua_so, mau)
-    bg = _chay_that(cua_so, qtbot, monkeypatch, "AB 9")
-    assert bg.trang_thai is TrangThai.THANH_CONG and cua_so.fake.so_moi_nhan == ["AB 9"]
+    bg = _chay_that(cua_so, qtbot, monkeypatch, "ab12345678")
+    assert bg.trang_thai is TrangThai.THANH_CONG and cua_so.fake.so_moi_nhan == ["AB 12345678"]
     assert cua_so.fake.so_lan_luu == 1
 
 
@@ -306,3 +318,163 @@ def test_tat_hieu_ung_he_thong_thi_khong_chuyen_canh(cua_so, qtbot, monkeypatch)
     qtbot.waitExposed(w)
     w.di_toi(S.LICH_SU)
     assert not w.stack.findChildren(QLabel, "chuyenMan")
+
+
+def test_tra_loi_sai_dang_coi_nhu_bo_qua(cua_so, mau, qtbot, monkeypatch):
+    _nap(cua_so, mau)
+    bg = _chay_that(cua_so, qtbot, monkeypatch, "TEST0001")
+    assert bg.trang_thai is TrangThai.CAN_KIEM_TRA and cua_so.fake.so_moi_nhan == []
+
+
+def _co_lich_su(w, mau, qtbot, so_lan=1):
+    _nap(w, mau)
+    _het_loi(w)
+    for _ in range(so_lan):
+        _chay(w, qtbot)
+
+
+def test_xoa_mot_lo_o_lich_su_phai_xac_nhan_va_cap_nhat_ngay(cua_so, mau, qtbot, monkeypatch):
+    w = cua_so
+    _co_lich_su(w, mau, qtbot)
+    m = w.man[S.LICH_SU]
+    w.di_toi(S.LICH_SU)
+    monkeypatch.setattr(S, "hop_xac_nhan", lambda *a, **k: False)
+    m.xoa_dong(0)
+    assert m.bang.rowCount() == 1
+    goi = []
+    monkeypatch.setattr(S, "hop_xac_nhan", lambda *a, **k: goi.append(k) or True)
+    m.xoa_dong(0)
+    assert goi[0]["kieu"] == "nguy_hiem" and goi[0]["nut_huy"] == "Huỷ"
+    assert m.bang.rowCount() == 0 and w.phien.store.ds_lo() == []
+    assert w.phien.file is None and w.phien.lo is None  # xoá đúng lô đang mở thì về Chưa chọn file
+    w.di_toi(S.LO_MOI)
+    assert w.man[S.LO_MOI].trang.currentIndex() == 0 and not w.man[S.LO_MOI].tiep.isEnabled()
+
+
+def test_xoa_toan_bo_lich_su(cua_so, mau, qtbot, monkeypatch):
+    w = cua_so
+    _co_lich_su(w, mau, qtbot, so_lan=2)
+    m = w.man[S.LICH_SU]
+    w.di_toi(S.LICH_SU)
+    assert m.bang.rowCount() == 2
+    monkeypatch.setattr(S, "hop_xac_nhan", lambda *a, **k: True)
+    m.xoa_het()
+    assert m.bang.rowCount() == 0 and w.phien.store.ds_lo() == []
+
+
+def test_xoa_trong_lo_gan_day(cua_so, mau, qtbot, monkeypatch):
+    w = cua_so
+    _co_lich_su(w, mau, qtbot)
+    m = w.man[S.LO_MOI]
+    w.di_toi(S.LO_MOI)
+    assert m.gan_day.count() == 1
+    monkeypatch.setattr(S, "hop_xac_nhan", lambda *a, **k: True)
+    m.xoa_gan_day(w.phien.store.ds_lo()[0]["id"])
+    assert m.gan_day.count() == 0 and w.phien.store.ds_lo() == []
+
+
+def test_dang_chay_thi_khong_xoa_duoc_lich_su(cua_so, mau, qtbot, monkeypatch):
+    w = cua_so
+    _co_lich_su(w, mau, qtbot)
+    w.phien.dang_chay = True
+    try:
+        m = w.man[S.LICH_SU]
+        w.di_toi(S.LICH_SU)
+        tat, goi_y = m.nut_xoa_het.isEnabled(), m.nut_xoa_het.toolTip()
+        monkeypatch.setattr(S, "hop_xac_nhan", lambda *a, **k: True)
+        m.xoa_het()
+        con = len(w.phien.store.ds_lo())
+    finally:
+        w.phien.dang_chay = False  # cửa sổ đang chạy thì không cho đóng: phải trả cờ để dọn test
+    assert not tat and "đang chạy" in goi_y.lower() and con == 1
+
+
+def test_danh_sach_nguoi_xu_ly_lay_tu_mplis_khi_chay_va_chon_theo_tai_khoan(cua_so, mau, qtbot):
+    w = cua_so
+    w.fake.danh_ba = {"a.nguyen": "Nguyễn Văn A", "b.tran": "Trần Thị B"}
+    _nap(w, mau)
+    _het_loi(w)
+    _chay(w, qtbot)
+    assert w.phien.settings.danh_ba_can_bo == {"a.nguyen": "Nguyễn Văn A", "b.tran": "Trần Thị B"}
+    m = w.man[S.LO_MOI]
+    w.di_toi(S.LO_MOI)
+    chu = [m.can_bo.itemText(i) for i in range(m.can_bo.count())]
+    assert chu[0] == "ndanh.tnmt" and "a.nguyen — Nguyễn Văn A" in chu and "b.tran — Trần Thị B" in chu
+    m.can_bo.setCurrentText("b.tran — Trần Thị B")
+    m._sang_kiem_tra()
+    assert w.phien.can_bo == "b.tran"  # chỉ dùng tài khoản để chọn người trên MPLIS
+
+
+def test_khung_chon_file_gon_mot_hang(cua_so, mau):
+    m = cua_so.man[S.LO_MOI]
+    cao_trong = m.vung.sizeHint().height()
+    m.mo_file(mau)
+    assert cao_trong <= 100 and m.vung.sizeHint().height() <= 100
+
+
+def test_xoa_the_lo_gan_day_xoa_moi_lan_chay_cua_file_do(cua_so, mau, qtbot, monkeypatch):
+    w = cua_so
+    _co_lich_su(w, mau, qtbot, so_lan=3)
+    m = w.man[S.LO_MOI]
+    w.di_toi(S.LO_MOI)
+    assert m.gan_day.count() == 1 and len(w.phien.store.ds_lo()) == 3  # một thẻ cho cả 3 lần chạy cùng file
+    goi = []
+    monkeypatch.setattr(S, "hop_xac_nhan", lambda *a, **k: goi.append(a) or True)
+    m.xoa_gan_day(w.phien.store.ds_lo()[0]["id"])
+    assert m.gan_day.count() == 0 and w.phien.store.ds_lo() == []
+    assert goi[0][2] == "" and goi[0][3] == []  # hộp xác nhận chỉ có câu hỏi ngắn
+
+
+
+def test_chay_lai_ho_so_dang_tao_giu_trang_thai_de_bat_buoc_tra_trung(cua_so, mau, qtbot, monkeypatch):
+    w = cua_so
+    _co_lich_su(w, mau, qtbot)
+    k = w.phien.lo.ho_so[0].key
+    w.phien.store.mark(k, TrangThai.DANG_TAO, "Đã bấm Lưu, chưa xác nhận")
+    w.phien.ket_qua[k] = ("Lỗi", "mất mạng", "")
+    m = w.man[S.KET_QUA]
+    w.di_toi(S.KET_QUA)
+    monkeypatch.setattr(S, "hop_xac_nhan", lambda *a, **k: True)
+    m.chay_lai([k])
+    assert w.phien.store.get(k).trang_thai is TrangThai.DANG_TAO and [h.key for h in w.phien.can_chay] == [k]
+
+
+def test_chay_lai_mot_ho_so_chi_lay_dung_ho_so_do(cua_so, mau, qtbot, monkeypatch):
+    w = cua_so
+    _co_lich_su(w, mau, qtbot)
+    a, b = w.phien.lo.ho_so[0].key, w.phien.lo.ho_so[1].key
+    w.phien.ket_qua[a] = ("Lỗi", "x", "")
+    w.phien.ket_qua[b] = ("Lỗi", "y", "")
+    m = w.man[S.KET_QUA]
+    w.di_toi(S.KET_QUA)
+    m.chips["Tất cả"].click()
+    for r in range(m.bang.rowCount()):
+        m.bang.item(r, 0).setCheckState(Qt.CheckState.Checked)
+    monkeypatch.setattr(S, "hop_xac_nhan", lambda *a, **k: True)
+    m.chay_lai([a])
+    assert [h.key for h in w.phien.can_chay] == [a]
+
+
+def test_dang_chay_khong_doi_duoc_file_hay_lo(cua_so, mau, qtbot, tmp_path):
+    w = cua_so
+    _co_lich_su(w, mau, qtbot)
+    cu = w.phien.file
+    w.phien.dang_chay = True
+    try:
+        w.man[S.LO_MOI].mo_file(tmp_path / "khac.xlsx")
+        w.man[S.LO_MOI]._sang_kiem_tra()
+        file_sau, kq_sau = w.phien.file, dict(w.phien.ket_qua)
+    finally:
+        w.phien.dang_chay = False
+    assert file_sau == cu and kq_sau
+
+
+def test_mo_lo_tu_lich_su_bo_danh_sach_chay_lai_cu(cua_so, mau, qtbot):
+    w = cua_so
+    _co_lich_su(w, mau, qtbot)
+    w.phien.can_chay, w.phien.da_reset = w.phien.lo.ho_so[:1], True
+    m = w.man[S.LICH_SU]
+    w.di_toi(S.LICH_SU)
+    m.bang.selectRow(0)
+    m.mo(S.KET_QUA)
+    assert w.phien.can_chay is None and w.phien.da_reset is False

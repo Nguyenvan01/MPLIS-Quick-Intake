@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLineEdit, QPushButton
+from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QPushButton
 
 from tiep_nhan.app import giao_dien as G
 
@@ -141,7 +141,7 @@ def test_dai_che_do_hien_dung_che_do_va_an_khi_khong_chay(qtbot, che_do):
 
 
 TEN_ICON = {"xong", "canh_bao", "loi", "dong_ho", "cai_dat", "thu_muc", "anh", "trace", "tai_xuong", "chay", "tam_dung", "tim", "doc_lai",
-            "excel", "thong_tin", "co_le", "xuong"}
+            "excel", "thong_tin", "co_le", "xuong", "xoa"}
 
 
 def test_bo_icon_lay_dung_hinh_lucide():
@@ -199,3 +199,73 @@ def test_dat_tien_do_co_hieu_ung_den_dung_gia_tri(qtbot, monkeypatch):
     t.setValue(0)
     G.dat_tien_do(t, 2)
     qtbot.waitUntil(lambda: t.value() == 2, timeout=2_000)
+
+
+def test_hop_nhap_so_sai_dang_thi_khong_dong_y_duoc_va_bao_do(qtbot):
+    kq = {}
+
+    def bam():
+        d = QApplication.activeModalWidget()
+        o = d.findChild(QLineEdit)
+        nut = next(b for b in d.findChildren(QPushButton) if b.text() == "Dùng số mới")
+        o.setText("TEST0001")
+        kq["sai"] = (nut.isEnabled(), any(x.text() == "Sai dạng" and x.isVisible() for x in d.findChildren(QLabel)))
+        o.setText("aa12345678")
+        kq["dung"] = (nut.isEnabled(), any(x.text() == "Sai dạng" and x.isVisible() for x in d.findChildren(QLabel)))
+        nut.click()
+
+    _sau(bam)
+    tra = G.hop_nhap(None, "Trùng", "", "Số mới", nut_dong_y="Dùng số mới", hop_le=lambda s: s.lower() == "aa12345678", bao_sai="Sai dạng")
+    assert kq == {"sai": (False, True), "dung": (True, False)} and tra == "aa12345678"
+
+
+def test_hop_xac_nhan_doi_ten_nut_huy_va_van_la_mac_dinh(qtbot):
+    kq = {}
+
+    def bam():
+        d = QApplication.activeModalWidget()
+        kq["mac_dinh"] = [b.text() for b in d.findChildren(QPushButton) if b.isDefault()]
+        QTest.keyClick(d, Qt.Key.Key_Return)
+
+    _sau(bam)
+    assert G.hop_xac_nhan(None, "Xoá?", "", [], "Xoá", kieu="nguy_hiem", nut_huy="Huỷ") is False
+    assert kq["mac_dinh"] == ["Huỷ"]
+
+
+def _do_sang(mau: str) -> float:
+    def kenh(c: int) -> float:
+        c = c / 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = (int(mau[i:i + 2], 16) for i in (1, 3, 5))
+    return 0.2126 * kenh(r) + 0.7152 * kenh(g) + 0.0722 * kenh(b)
+
+
+def tuong_phan(chu: str, nen: str) -> float:
+    a, b = sorted((_do_sang(chu), _do_sang(nen)), reverse=True)
+    return (a + 0.05) / (b + 0.05)
+
+
+def cap_chu_nen() -> list[tuple[str, str, str]]:
+    cap = [("Chữ chính / nền trang", G.CHU, G.NEN_APP), ("Chữ chính / card", G.CHU, G.NEN_THE),
+           ("Chữ phụ / nền trang", G.CHU_PHU, G.NEN_APP), ("Chữ phụ / card", G.CHU_PHU, G.NEN_THE),
+           ("Chữ mờ / nền trang", G.CHU_NHAN, G.NEN_APP), ("Chữ mờ / card", G.CHU_NHAN, G.NEN_THE),
+           ("Nút chính", G.TRANG, G.NUT_CHINH), ("Nút chính khi rê", G.TRANG, G.NUT_CHINH_RE),
+           ("Nút chính bị tắt", G.NUT_TAT_CHU, G.NUT_TAT_NEN), ("Nút phụ bị tắt / nền trang", G.CHU_NHAN, G.NEN_APP),
+           ("Nút phụ bị tắt / card", G.CHU_NHAN, G.NEN_THE), ("Link / nền trang", G.LIEN_KET, G.NEN_APP),
+           ("Link / card", G.LIEN_KET, G.NEN_THE), ("Dòng chọn trong card", G.CHU, G.CHON_THE),
+           ("Mục chọn dropdown", G.CHU, G.NEN_CHON), ("Chip đang chọn", G.TRANG, G.NUT_CHINH), ("Nút chính khi bấm", G.TRANG, G.NUT_CHINH_BAM),
+           ("Mục đang chọn (chữ xanh)", G.NHAN, G.NEN_CHON), ("Chữ xanh / nền trang", G.NHAN, G.NEN_APP),
+           ("Phân đoạn chưa chọn", G.CHU_PHU, G.NEN_PHAN_DOAN), ("Tooltip", G.TRANG, G.CHU)]
+    cap += [(f"Badge {ten}", chu, nen) for ten, (chu, nen, _) in G.TRANG_THAI.items()]
+    cap += [(f"Badge/dải {cd['ten']}", cd["chu_nhan"], cd["nen_nhan"]) for cd in G.CHE_DO.values()]
+    cap += [(f"Thẻ {cd['ten']} đang chọn", cd["chu"], cd["nen_nhat"]) for cd in G.CHE_DO.values()]
+    return cap
+
+
+@pytest.mark.parametrize("ten, chu, nen", cap_chu_nen())
+def test_tuong_phan_chu_tren_nen_dat_wcag_aa(ten, chu, nen):
+    assert tuong_phan(chu, nen) >= 4.5, f"{ten}: {tuong_phan(chu, nen):.2f}"
+
+
+def test_nap_duoc_font_trong_assets(qtbot):
+    assert {"Host Grotesk", "Instrument Sans"} <= set(G.nap_font())

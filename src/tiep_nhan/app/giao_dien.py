@@ -4,57 +4,76 @@ from __future__ import annotations
 import re
 import sys
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import date, datetime
 
-from PySide6.QtCore import QByteArray, QEasingCurve, QElapsedTimer, QEvent, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer
+from PySide6.QtCore import QByteArray, QEasingCurve, QElapsedTimer, QEvent, QObject, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QFontMetrics, QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtWidgets import (QAbstractButton, QApplication, QDialog, QFrame, QGraphicsDropShadowEffect, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout,
+from PySide6.QtWidgets import (QAbstractButton, QApplication, QDialog, QComboBox, QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout,
                                QLabel, QLayout, QLineEdit, QProgressBar, QPushButton, QSizePolicy, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
                                QVBoxLayout, QWidget)
 
-from ..infra.config import sub_dir
-from ..infra.logging import che_cccd
+from ..infra.config import assets_dir, sub_dir
+from ..infra.logging import che_cccd, che_so_trong_chu
 from .icon_lucide import ICON
 
-NEN_APP, NEN_THE, VIEN, VIEN_O = "#F6F7F9", "#FFFFFF", "#E4E7EC", "#D0D5DD"
-CHU, CHU_PHU, CHU_NHAN, CHU_NUT = "#101828", "#475467", "#667085", "#344054"
-NHAN, NHAN_DAM, NEN_CHON, VONG_FOCUS = "#0B5D56", "#08453F", "#E7F2F0", "#5FB8A9"
-KE_BANG, NEN_DANG_CHAY = "#EEF0F3", "#F3FAF8"
-VIEN_KEO, NEN_KEO = "#9CCFC5", "#F3FAF8"          # khung kéo thả file
-NEN_BAO_LOI, VIEN_BAO_LOI, CHU_LOI = "#FEF0EE", "#F7C1BA", "#B42318"
-NEN_XU_LY_TAY, VIEN_XU_LY_TAY = "#FFF8EC", "#F9D9A8"
-CAM, CHU_MO, TRANG = "#DC6803", "#98A2B3", "#FFFFFF"
-NEN_PHAN_DOAN = "#EAECF0"
+# ===== Token của hệ thiết kế: mọi màn hình chỉ lấy màu, font từ đây =====
+# Tông xanh dương – trắng (người dùng chốt 10/11/2026): nền trắng, card xanh rất nhạt, nút chính và mục đang chọn xanh dương.
+NEN_APP, NEN_THE, VIEN, VIEN_DAM = "#FFFFFF", "#F5F8FF", "#DCE3F0", "#B6C3DD"   # nền trang, card inset, kẻ mảnh, viền khi rê
+VIEN_O = VIEN                                                                   # viền ô nhập, nút phụ
+CHU, CHU_PHU, CHU_NHAN = "#0F172A", "#475569", "#5B6B82"                        # chữ chính, phụ, mờ
+CHU_NUT, TRANG = CHU, "#FFFFFF"                                                 # chữ nút phụ; chữ trên nền xanh
+NUT_CHINH, NUT_CHINH_RE, NUT_CHINH_BAM = "#2563EB", "#1D4ED8", "#1E40AF"
+NUT_TAT_NEN, NUT_TAT_CHU = "#E2E8F0", "#475569"                                 # nút chính bị tắt: vẫn đọc được chữ
+LIEN_KET = VONG_FOCUS = "#2563EB"
+VONG_FOCUS_NUT = "#1E3A8A"                                                      # viền focus trên nút nền xanh
+NHAN, NHAN_DAM = "#1D4ED8", NUT_CHINH_BAM                                       # mục đang chọn, mốc bước, icon nhấn
+NEN_RE, NEN_CHON, CHON_THE = "#F0F5FF", "#E3ECFD", "#DCE7FC"                    # rê chuột, mục chọn, dòng chọn trong card
+NEN_PHAN_DOAN = "#E4EBF7"                                                       # rãnh nhóm phân đoạn, thanh tiến độ
+KE_BANG, NEN_DANG_CHAY = NEN_CHON, "#EDECED"
+VIEN_KEO, NEN_KEO = VIEN_DAM, NEN_THE                                           # khung kéo thả file
+CHU_MO = "#8A8A8A"                                                              # icon trang trí ở trạng thái trống
+FONT_TIEU_DE = ["Segoe UI", ".AppleSystemUIFont", "Helvetica Neue", "Arial"]  # ponytail: Host Grotesk thiếu chữ Việt, chờ người dùng chọn font
+FONT_NOI_DUNG = ["Segoe UI", ".AppleSystemUIFont", "Helvetica Neue", "Arial"]  # ponytail: Instrument Sans thiếu chữ Việt, như trên
+CO_TIEU_DE_MAN, CO_TIEU_DE_THE, CO_CHU, CO_NHAN, CO_NHO = 30, 18, 14, 13, 12   # đúng 5 cỡ chữ
 
-# trạng thái -> (chữ, nền, chấm)
+# trạng thái -> (chữ, nền, chấm); chữ trên nền đạt WCAG AA >= 4.5:1 (đo trong tests/test_giao_dien.py)
 TRANG_THAI = {
-    "Thành công": ("#146C2E", "#E3F4E8", "#17803D"),
-    "Đã có sẵn": ("#344054", "#EEF2F6", "#667085"),
-    "Cần kiểm tra": ("#93370D", "#FEF4E6", "#DC6803"),
-    "Lỗi": ("#B42318", "#FEF0EE", "#D92D20"),
-    "Chạy thử": ("#1849A9", "#EAF2FF", "#2E6BD6"),
-    "Đã chuyển": ("#5925DC", "#F1ECFE", "#7A5AF8"),
-    "Đang chạy": ("#0B5D56", "#FFFFFF", "#0B5D56"),
-    "Chờ": ("#475467", "#F2F4F7", "#98A2B3"),
+    "Thành công": ("#166534", "#DCFCE7", "#16A34A"),
+    "Đã có sẵn": ("#3F3F46", "#ECECEC", "#71717A"),
+    "Cần kiểm tra": ("#92400E", "#FEF3C7", "#D97706"),
+    "Lỗi": ("#991B1B", "#FEE2E2", "#DC2626"),
+    "Chạy thử": ("#1E40AF", "#DBEAFE", "#3B82F6"),
+    "Đã chuyển": ("#5B21B6", "#EDE9FE", "#8B5CF6"),
+    "Đang chạy": (CHU, NEN_APP, CHU),
+    "Chờ": (CHU_PHU, NEN_CHON, CHU_MO),
 }
+NEN_BAO_LOI, VIEN_BAO_LOI, CHU_LOI = TRANG_THAI["Lỗi"][1], TRANG_THAI["Lỗi"][1], TRANG_THAI["Lỗi"][0]
+NEN_XU_LY_TAY, VIEN_XU_LY_TAY = TRANG_THAI["Cần kiểm tra"][1], TRANG_THAI["Cần kiểm tra"][1]
+CAM = "#B45309"                                                                 # viền ô chưa chọn ở màn Ánh xạ
 CHE_DO = {
-    "thu": {"ten": "Chạy thử", "chu": "#1849A9", "nen": "#EAF2FF", "nen_nhat": "#F3F8FF", "chu_nhan": "#1849A9", "nen_nhan": "#EAF2FF",
+    "thu": {"ten": "Chạy thử", "chu": "#1E40AF", "nen": "#DBEAFE", "nen_nhat": "#EFF6FF", "chu_nhan": "#1E40AF", "nen_nhan": "#DBEAFE",
             "dai": "<b>CHẠY THỬ</b> · Chỉ điền form, không Lưu. Không tạo hồ sơ trên MPLIS."},
-    "that": {"ten": "Chạy thật", "chu": "#B54708", "nen": "#B54708", "nen_nhat": "#FFF6ED", "chu_nhan": "#FFFFFF", "nen_nhan": "#B54708",
+    "that": {"ten": "Chạy thật", "chu": "#9A3412", "nen": "#9A3412", "nen_nhat": "#FFF7ED", "chu_nhan": TRANG, "nen_nhan": "#9A3412",
              "dai": "<b>CHẠY THẬT</b> · Hồ sơ được Lưu lên MPLIS. Không đóng cửa sổ khi đang chạy."},
 }
-BONG = 10         # khoảng chừa quanh thẻ để vẽ bóng; hai thẻ kề nhau cách nhau 20px
+BONG = 10         # khoảng chừa quanh thẻ: hai thẻ kề nhau cách nhau 20px
 VAI_PHU = Qt.ItemDataRole.UserRole + 1  # dòng chữ thứ hai trong ô bảng
 
 
 def _font(co: int, dam: QFont.Weight = QFont.Weight.Normal, gian: float = 0.0) -> QFont:
     f = QFont()
-    f.setFamilies(["Segoe UI", ".AppleSystemUIFont", "Helvetica Neue", "Arial"])
+    f.setFamilies(FONT_NOI_DUNG)
     f.setPixelSize(co)
     f.setWeight(dam)
     f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, gian)
+    return f
+
+
+def _font_tieu_de(co: int) -> QFont:
+    f = _font(co, QFont.Weight.Medium)
+    f.setFamilies(FONT_TIEU_DE)
     return f
 
 
@@ -70,75 +89,76 @@ def font_so(co: int = 13, dam: QFont.Weight = QFont.Weight.Normal) -> QFont:
 QSS = f"""
 QWidget {{ color: {CHU}; }}
 QLabel, QCheckBox, QRadioButton {{ background: transparent; }}
-QDialog {{ background: {NEN_THE}; }}
-QToolTip {{ background: {CHU}; color: #FFFFFF; border: none; padding: 6px 10px; }}
+QDialog {{ background: {NEN_APP}; }}
+QToolTip {{ background: {CHU}; color: {TRANG}; border: none; padding: 6px 10px; }}
 QLabel#moTa, QLabel#phu {{ color: {CHU_PHU}; }}
 QLabel#nhanNhom {{ color: {CHU_NHAN}; }}
-QLabel#nhanO {{ font-size: 13px; font-weight: 600; color: {CHU_NUT}; }}
-QLabel#tieuDeThe {{ font-size: 15px; font-weight: 600; }}
-QWidget#khungNav {{ background: {NEN_THE}; border-right: 1px solid {VIEN}; }}
-QListWidget#nav {{ background: transparent; border: none; outline: 0; }}
-QListWidget#ganDay {{ background: transparent; border: none; outline: 0; }}
+QLabel#nhanO {{ font-size: {CO_NHAN}px; font-weight: 600; color: {CHU}; }}
+QLabel#tieuDeThe {{ font-size: {CO_TIEU_DE_THE}px; font-weight: 500; font-family: "{FONT_TIEU_DE[0]}"; }}
+QWidget#khungNav {{ background: {NEN_APP}; border-right: 1px solid {VIEN}; }}
+QListWidget#nav, QListWidget#ganDay {{ background: transparent; border: none; outline: 0; }}
 QListWidget#ganDay::item {{ border: none; padding: 0; }}
 QListWidget#ganDay::item:selected {{ background: transparent; }}
 QLineEdit, QComboBox {{
-    background: {NEN_THE}; border: 1px solid {VIEN_O}; border-radius: 10px; padding: 0 12px; min-height: 40px;
-    selection-background-color: {NHAN}; selection-color: #FFFFFF; }}
-QLineEdit:hover, QComboBox:hover {{ border-color: #98A2B3; }}
-QLineEdit:focus, QComboBox:focus {{ border: 2px solid {NHAN}; padding: 0 11px; }}
-QLineEdit[loi="true"], QComboBox[chuaChon="true"] {{ border: 2px solid {CAM}; padding: 0 11px; }}
-QLineEdit[loi="true"] {{ border-color: #D92D20; }}
+    background: {NEN_APP}; border: 1px solid {VIEN}; border-radius: 12px; padding: 0 12px; min-height: 40px; color: {CHU};
+    selection-background-color: {NEN_PHAN_DOAN}; selection-color: {CHU}; }}
+QLineEdit:hover, QComboBox:hover {{ border-color: {VIEN_DAM}; }}
+QLineEdit:focus, QComboBox:focus {{ border: 2px solid {VONG_FOCUS}; padding: 0 11px; }}
+QLineEdit[loi="true"] {{ border: 2px solid {TRANG_THAI["Lỗi"][2]}; padding: 0 11px; }}
+QComboBox[chuaChon="true"] {{ border: 2px solid {CAM}; padding: 0 11px; }}
+QComboBox {{ combobox-popup: 0; }}
 QComboBox::drop-down {{ border: none; width: 30px; }}
 QComboBox::down-arrow {{ image: url("MUI_TEN"); width: 12px; height: 12px; }}
-QComboBox QAbstractItemView {{ background: {NEN_THE}; border: 1px solid {VIEN}; selection-background-color: {NEN_CHON};
-    selection-color: {CHU}; outline: 0; }}
-QPushButton {{ background: {NEN_THE}; color: {CHU_NUT}; border: 1px solid {VIEN_O}; border-radius: 10px; padding: 0 16px;
-    min-height: 40px; font-weight: 600; }}
-QPushButton:hover {{ border-color: #98A2B3; background: #F9FAFB; }}
+QComboBox QAbstractItemView {{ background: {NEN_APP}; border: 1px solid {VIEN}; border-radius: 12px; padding: 4px; outline: 0;
+    font-size: {CO_CHU}px; selection-background-color: {NEN_CHON}; selection-color: {CHU}; }}
+QComboBox QAbstractItemView::item {{ min-height: 20px; padding: 8px 12px; border-radius: 8px; color: {CHU}; }}
+QComboBox QAbstractItemView::item:hover {{ background: {NEN_THE}; }}
+QComboBox QAbstractItemView::item:selected {{ background: {NEN_CHON}; color: {NHAN}; font-weight: 600; }}
+QPushButton {{ background: transparent; color: {CHU}; border: 1px solid {VIEN}; border-radius: 20px; padding: 0 18px;
+    min-height: 38px; max-height: 38px; font-weight: 600; }}
+QPushButton:hover {{ background: {NEN_THE}; border-color: {VIEN_DAM}; }}
 QPushButton:pressed {{ background: {NEN_CHON}; }}
-QPushButton:focus {{ border: 2px solid {VONG_FOCUS}; padding: 0 15px; }}
-QPushButton:disabled {{ color: #98A2B3; background: #F9FAFB; border-color: {VIEN}; }}
-QPushButton#chinh {{ background: {NHAN}; color: #FFFFFF; border: none; padding: 0 22px; }}
-QPushButton#chinh:hover, QPushButton#chinh:pressed {{ background: {NHAN_DAM}; }}
-QPushButton#chinh[that="true"] {{ background: #B54708; }}
-QPushButton#chinh[that="true"]:hover, QPushButton#chinh[that="true"]:pressed {{ background: #93370D; }}
-QPushButton#chinh:focus {{ border: 2px solid {VONG_FOCUS}; padding: 0 20px; }}
-QPushButton#chinh:disabled {{ background: {VIEN_O}; color: #FFFFFF; }}
-QPushButton#nguyHiem {{ color: {CHU_LOI}; border-color: {VIEN_BAO_LOI}; }}
-QPushButton#nguyHiem:hover {{ background: {NEN_BAO_LOI}; border-color: {CHU_LOI}; }}
-QPushButton#nguyHiem:disabled {{ color: #98A2B3; border-color: {VIEN}; }}
-QPushButton#chu {{ background: transparent; border: none; color: {NHAN}; padding: 0 6px; min-height: 28px; }}
-QPushButton#chu:hover {{ color: {NHAN_DAM}; text-decoration: underline; }}
-QPushButton#chu:focus {{ border: 2px solid {VONG_FOCUS}; padding: 0 4px; }}
-QPushButton#chip {{ border-radius: 16px; min-height: 32px; padding: 0 14px; font-weight: 500; }}
-QPushButton#chip:focus {{ padding: 0 13px; }}
-QPushButton#chip:checked {{ background: {NHAN}; color: #FFFFFF; border: 1px solid {NHAN}; }}
-QPushButton#phan {{ background: transparent; border: 2px solid transparent; border-radius: 8px; min-height: 30px; padding: 0 12px; }}
-QPushButton#phan:focus {{ border-color: {VONG_FOCUS}; padding: 0 12px; }}
-QPushButton#phan:checked {{ background: {NEN_THE}; color: {CHU}; }}
-QFrame#nhomPhan {{ background: {NEN_PHAN_DOAN}; border-radius: 10px; }}
-QToolButton#tep {{ background: {NEN_THE}; border: 1px solid {VIEN_O}; border-radius: 8px; }}
-QToolButton#tep:hover {{ background: {NEN_CHON}; }}
+QPushButton:focus {{ border: 2px solid {VONG_FOCUS}; padding: 0 17px; min-height: 36px; max-height: 36px; }}
+QPushButton:disabled {{ color: {CHU_NHAN}; border-color: {NEN_CHON}; background: transparent; }}
+QPushButton#chinh {{ background: {NUT_CHINH}; color: {TRANG}; border: none; padding: 0 22px; min-height: 40px; max-height: 40px; }}
+QPushButton#chinh:hover {{ background: {NUT_CHINH_RE}; }}
+QPushButton#chinh:pressed {{ background: {NUT_CHINH_BAM}; }}
+QPushButton#chinh:focus {{ border: 2px solid {VONG_FOCUS_NUT}; padding: 0 20px; min-height: 36px; max-height: 36px; }}
+QPushButton#chinh:disabled {{ background: {NUT_TAT_NEN}; color: {NUT_TAT_CHU}; }}
+QPushButton#chu {{ background: transparent; border: none; color: {LIEN_KET}; padding: 0 8px; min-height: 28px; max-height: 28px;
+    border-radius: 14px; }}
+QPushButton#chu:hover {{ text-decoration: underline; background: transparent; }}
+QPushButton#chu:focus {{ border: 2px solid {VONG_FOCUS}; padding: 0 6px; min-height: 24px; max-height: 24px; }}
+QPushButton#chip {{ border-radius: 16px; min-height: 30px; max-height: 30px; padding: 0 14px; font-weight: 500; }}
+QPushButton#chip:focus {{ padding: 0 13px; min-height: 28px; max-height: 28px; }}
+QPushButton#chip:checked {{ background: {NUT_CHINH}; color: {TRANG}; border: 1px solid {NUT_CHINH}; }}
+QPushButton#phan {{ background: transparent; border: 2px solid transparent; border-radius: 15px; min-height: 26px; max-height: 26px;
+    padding: 0 12px; color: {CHU_PHU}; }}
+QPushButton#phan:focus {{ border-color: {VONG_FOCUS}; }}
+QPushButton#phan:checked {{ background: {NEN_APP}; color: {NHAN}; }}
+QFrame#nhomPhan {{ background: {NEN_PHAN_DOAN}; border-radius: 18px; }}
+QToolButton#tep {{ background: transparent; border: 1px solid {VIEN}; border-radius: 15px; }}
+QToolButton#tep:hover {{ background: {NEN_APP}; border-color: {VIEN_DAM}; }}
 QToolButton#tep:focus {{ border: 2px solid {VONG_FOCUS}; }}
-QCheckBox, QRadioButton {{ spacing: 8px; border: 1px solid transparent; border-radius: 6px; padding: 2px; }}
+QToolButton#tep:disabled {{ border-color: {NEN_CHON}; }}
+QCheckBox, QRadioButton {{ spacing: 8px; border: 2px solid transparent; border-radius: 8px; padding: 2px; }}
 QCheckBox:focus, QRadioButton:focus {{ border-color: {VONG_FOCUS}; }}
 QCheckBox::indicator, QRadioButton::indicator {{ width: 20px; height: 20px; }}
 QCheckBox::indicator:unchecked {{ image: url("O_TICH_TAT"); }}
 QCheckBox::indicator:checked {{ image: url("O_TICH_BAT"); }}
 QRadioButton::indicator:unchecked {{ image: url("O_TRON_TAT"); }}
 QRadioButton::indicator:checked {{ image: url("O_TRON_BAT"); }}
-QTableWidget, QTreeWidget {{ background: {NEN_THE}; border: 1px solid transparent; border-radius: 8px; outline: 0; }}
+QTableWidget, QTreeWidget {{ background: transparent; border: 2px solid transparent; border-radius: 10px; outline: 0; }}
 QTableWidget:focus, QTreeWidget:focus {{ border-color: {VONG_FOCUS}; }}
-QListWidget, QTextBrowser, QPlainTextEdit {{ background: {NEN_THE}; border: none; outline: 0; }}
-QTableWidget::item, QTreeWidget::item {{ border-bottom: 1px solid {KE_BANG}; padding: 2px 10px; }}
-QTableWidget::item:selected, QTreeWidget::item:selected {{ background: {NEN_CHON}; color: {CHU}; }}
-QHeaderView {{ background: {NEN_THE}; }}
-QHeaderView::section {{ background: {NEN_THE}; border: none; border-bottom: 1px solid {VIEN}; padding: 10px;
-    font-size: 12px; font-weight: 600; color: {CHU_PHU}; }}
+QListWidget, QTextBrowser, QPlainTextEdit {{ background: transparent; border: none; outline: 0; }}
+QTableWidget::item, QTreeWidget::item {{ border: none; padding: 2px 10px; }}
+QTableWidget::item:selected, QTreeWidget::item:selected {{ background: {CHON_THE}; color: {CHU}; }}
+QHeaderView, QHeaderView::section {{ background: transparent; }}
+QHeaderView::section {{ border: none; padding: 10px; font-size: {CO_NHO}px; font-weight: 600; color: {CHU_PHU}; }}
 QProgressBar {{ border: none; background: {NEN_PHAN_DOAN}; border-radius: 5px; max-height: 10px; color: transparent; }}
-QProgressBar::chunk {{ background: {NHAN}; border-radius: 5px; }}
-QProgressBar[cheDo="thu"]::chunk {{ background: #2E6BD6; }}
-QProgressBar[cheDo="that"]::chunk {{ background: #B54708; }}
+QProgressBar::chunk {{ background: {NUT_CHINH}; border-radius: 5px; }}
+QProgressBar[cheDo="thu"]::chunk {{ background: {CHE_DO["thu"]["chu"]}; }}
+QProgressBar[cheDo="that"]::chunk {{ background: {CHE_DO["that"]["chu"]}; }}
 QProgressBar#manh {{ max-height: 8px; border-radius: 4px; }}
 QProgressBar#manh::chunk {{ border-radius: 4px; }}
 QScrollArea {{ background: transparent; border: none; }}
@@ -146,7 +166,7 @@ QScrollArea > QWidget > QWidget {{ background: transparent; }}
 QSplitter::handle {{ background: transparent; width: 6px; }}
 QScrollBar:vertical {{ width: 8px; background: transparent; }}
 QScrollBar:horizontal {{ height: 8px; background: transparent; }}
-QScrollBar::handle {{ background: {VIEN_O}; border-radius: 4px; min-height: 28px; min-width: 28px; }}
+QScrollBar::handle {{ background: {VIEN_DAM}; border-radius: 4px; min-height: 28px; min-width: 28px; }}
 QScrollBar::add-line, QScrollBar::sub-line, QScrollBar::add-page, QScrollBar::sub-page {{ width: 0; height: 0; background: none; }}
 """
 
@@ -175,8 +195,8 @@ def _o_chon(tron: bool, bat: bool) -> str:
         p.drawRoundedRect(r, 5, 5)
         p.drawPixmap(QRectF(3, 3, 14, 14), ve_anh("xong", TRANG, 14), QRectF(0, 0, 28, 28))
     else:
-        p.setPen(QPen(QColor(NHAN if bat else VIEN_O), 1.5))
-        p.setBrush(QColor(NEN_THE))
+        p.setPen(QPen(QColor(NHAN if bat else VIEN_DAM), 1.5))
+        p.setBrush(QColor(NEN_APP))
         p.drawEllipse(r) if tron else p.drawRoundedRect(r, 5, 5)
         if bat:
             p.setPen(Qt.PenStyle.NoPen)
@@ -187,7 +207,40 @@ def _o_chon(tron: bool, bat: bool) -> str:
     return path.as_posix()
 
 
+class _ChinhCombo(QObject):
+    """Áp cho mọi QComboBox: bộ vẽ mặc định của popup bỏ qua QSS ::item nên thay bằng QStyledItemDelegate;
+    popup rộng ít nhất bằng ô và nở theo chữ dài nhất thay vì cắt chữ."""
+
+    def __init__(self, app: QApplication):
+        super().__init__(app)
+        self._cua: dict[int, QComboBox] = {}
+
+    def eventFilter(self, o: QObject, e: QEvent) -> bool:
+        if e.type() == QEvent.Type.Polish and isinstance(o, QComboBox) and not o.property("daChinh"):
+            o.setProperty("daChinh", True)
+            o.setItemDelegate(QStyledItemDelegate(o))
+            o.view().setTextElideMode(Qt.TextElideMode.ElideNone)
+            self._cua[id(o.view())] = o
+            o.view().installEventFilter(self)
+            o.destroyed.connect(lambda _=None, k=id(o.view()): self._cua.pop(k, None))
+        elif e.type() == QEvent.Type.Show and id(o) in self._cua:
+            c, v = self._cua[id(o)], o
+            rong = max(c.width(), v.sizeHintForColumn(0) + 24 + 8 + v.verticalScrollBar().sizeHint().width())
+            if v.window().width() < rong:
+                v.window().resize(rong, v.window().height())
+        return False
+
+
+def nap_font() -> list[str]:
+    """Nạp font trong assets/fonts; trả về tên các họ font đã nạp."""
+    ho: list[str] = []
+    for f in sorted((assets_dir() / "fonts").glob("*.ttf")):
+        ho += QFontDatabase.applicationFontFamilies(QFontDatabase.addApplicationFont(str(f.resolve())))
+    return sorted(set(ho))
+
+
 def ap_giao_dien(app: QApplication) -> None:
+    nap_font()
     app.setStyle("Fusion")
     app.setFont(_font(14))
     pal = QPalette()
@@ -202,6 +255,8 @@ def ap_giao_dien(app: QApplication) -> None:
     for ten, tron, bat in (("O_TICH_TAT", False, False), ("O_TICH_BAT", False, True), ("O_TRON_TAT", True, False), ("O_TRON_BAT", True, True)):
         qss = qss.replace(ten, _o_chon(tron, bat))
     app.setStyleSheet(qss)
+    app.chinh_combo = _ChinhCombo(app)  # giữ tham chiếu để bộ lọc không bị thu hồi
+    app.installEventFilter(app.chinh_combo)
 
 
 # ----- Định dạng dữ liệu -----
@@ -219,7 +274,7 @@ def ten_ho_so(khoa: str) -> str:
 
 def che_so_giay_to(chu: str) -> str:
     """Nội dung lỗi có thể chứa nguyên số CCCD, nên phải che trước khi hiện ở bảng và tooltip."""
-    return _SO_CCCD.sub(lambda m: che_cccd(m[0]), chu)
+    return che_so_trong_chu(chu)
 
 
 def rut_gon_ghi_chu(text: str) -> tuple[str, str]:
@@ -346,46 +401,43 @@ def dat_tien_do(thanh: QProgressBar, gia_tri: int) -> None:
 
 
 # ----- Thẻ và nút -----
-def _ve_the(p: QPainter, r: QRectF, nen: str, vien: str, day: float, bong: bool, dut: bool = False, bo: float = 16) -> None:
+def _ve_the(p: QPainter, r: QRectF, nen: str, vien: str | None, day: float, dut: bool = False, bo: float = 16) -> None:
+    """Card inset: nền phẳng, bo 16px, không bóng; chỉ có viền khi cần (khung kéo thả, đang chọn, focus)."""
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    if bong:  # các vòng chồng lên nhau tạo một lớp bóng mờ 16px, độ đậm khoảng 5%
+    if vien:
+        but = QPen(QColor(vien), day)
+        if dut:
+            but.setStyle(Qt.PenStyle.DashLine)
+        p.setPen(but)
+    else:
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(16, 24, 40, 2))
-        for i in range(BONG - 2, 0, -1):
-            p.drawRoundedRect(r.translated(0, 2).adjusted(-i, -i, i, i), bo + i, bo + i)
-    but = QPen(QColor(vien), day)
-    if dut:
-        but.setStyle(Qt.PenStyle.DashLine)
-    p.setPen(but)
     p.setBrush(QColor(nen))
-    nua = day / 2
+    nua = day / 2 if vien else 0
     p.drawRoundedRect(r.adjusted(nua, nua, -nua, -nua), bo, bo)
 
 
 class The(QFrame):
-    """Thẻ nội dung. Tự vẽ bóng vì QGraphicsDropShadowEffect làm bảng dài bị giật."""
+    """Thẻ nội dung dạng inset. vien=None: không viền; bong giữ để gọi cũ không lỗi, hệ thiết kế không dùng bóng."""
 
-    def __init__(self, *noi_dung: QWidget | QLayout, dem: int = 20, bong: bool = True, nen: str = NEN_THE, vien: str = VIEN,
+    def __init__(self, *noi_dung: QWidget | QLayout, dem: int = 24, bong: bool = False, nen: str = NEN_THE, vien: str | None = None,
                  day: float = 1, dut: bool = False):
         super().__init__()
         self._kieu = (nen, vien, day, dut)
-        self._bong = bong
         lay = QVBoxLayout(self)
         lay.setContentsMargins(BONG + dem, BONG + dem, BONG + dem, BONG + dem)
         lay.setSpacing(10)
         for x in noi_dung:
             lay.addLayout(x) if isinstance(x, QLayout) else lay.addWidget(x)
 
-    def dat(self, nen: str | None = None, vien: str | None = None, day: float | None = None) -> None:
-        n, v, d, dut = self._kieu
-        self._kieu = (nen or n, vien or v, day or d, dut)
+    def dat(self, nen: str | None = None, vien: str | None = None, day: float | None = None, dut: bool | None = None) -> None:
+        n, v, d, du = self._kieu
+        self._kieu = (nen or n, vien or v, day or d, du if dut is None else dut)
         self.update()
 
     def paintEvent(self, _e) -> None:
         p = QPainter(self)
         r = QRectF(self.rect()).adjusted(BONG, BONG, -BONG, -BONG)
-        n, v, d, dut = self._kieu
-        _ve_the(p, r, n, v, d, self._bong, dut)
+        _ve_the(p, r, *self._kieu)
 
 
 class _NutCoIcon(QPushButton):
@@ -397,42 +449,14 @@ class _NutCoIcon(QPushButton):
 
 
 class NutChinh(_NutCoIcon):
-    """Nút hành động chính của màn hình: có độ nâng, nâng thêm khi rê chuột."""
+    """Nút hành động chính: nền tối, dạng viên thuốc (bo bằng nửa chiều cao, đặt trong QSS)."""
 
     def __init__(self, chu: str, icon: QIcon | None = None):
         super().__init__(chu, icon)
         self.setObjectName("chinh")
-        self._bong = QGraphicsDropShadowEffect(self, blurRadius=10, xOffset=0, yOffset=2, color=self._mau_bong(NHAN))
-        self.setGraphicsEffect(self._bong)
-        self._dong = QPropertyAnimation(self._bong, b"blurRadius", self, duration=150, easingCurve=QEasingCurve.Type.OutCubic)
-
-    @staticmethod
-    def _mau_bong(mau: str) -> QColor:
-        c = QColor(mau)
-        c.setAlpha(90)
-        return c
 
     def dat_chay_that(self, that: bool) -> None:
         dat_thuoc_tinh(self, "that", "true" if that else "false")
-        self._bong.setColor(self._mau_bong("#B54708" if that else NHAN))
-
-    def _nang(self, muc: float) -> None:
-        self._dong.stop()
-        self._dong.setEndValue(muc)
-        self._dong.start()
-
-    def enterEvent(self, e) -> None:
-        self._nang(20)
-        super().enterEvent(e)
-
-    def leaveEvent(self, e) -> None:
-        self._nang(10)
-        super().leaveEvent(e)
-
-    def changeEvent(self, e) -> None:
-        if e.type() == QEvent.Type.EnabledChange:
-            self._bong.setEnabled(self.isEnabled())
-        super().changeEvent(e)
 
 
 class NutChayThat(NutChinh):
@@ -457,6 +481,30 @@ class NutChu(_NutCoIcon):
     def __init__(self, chu: str, icon: QIcon | None = None):
         super().__init__(chu, icon)
         self.setObjectName("chu")
+
+
+class NhanRutGon(QLabel):
+    """Nhãn một dòng tự cắt bớt ở giữa theo bề rộng còn lại, tooltip là chữ đầy đủ; không đẩy widget bên cạnh."""
+
+    def __init__(self, text: str = ""):
+        super().__init__()
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.dat(text)
+
+    def dat(self, text: str) -> None:
+        self._day = text
+        self.setToolTip(text)
+        self._cat()
+
+    def _cat(self) -> None:
+        super().setText(QFontMetrics(self.font()).elidedText(self._day, Qt.TextElideMode.ElideMiddle, max(self.width(), 40)))
+
+    def resizeEvent(self, e) -> None:
+        super().resizeEvent(e)
+        self._cat()
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(40, super().minimumSizeHint().height())
 
 
 class NhanTrangThai(QLabel):
@@ -593,7 +641,7 @@ class DelegateO(_DelegateNen):
         kho = QFontMetrics(f).boundingRect(QRect(0, 0, ve_rong - 20, 100), Qt.TextFlag.TextWordWrap, chu)
         khung = QRect(o.rect.x() + 10, o.rect.center().y() - kho.height() // 2 - 5, min(kho.width() + 20, ve_rong), kho.height() + 10)
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor("#F2F4F7"))
+        p.setBrush(QColor(NEN_APP))
         p.drawRoundedRect(QRectF(khung), 8, 8)
         p.setPen(QColor(CHU))
         p.drawText(khung.adjusted(10, 0, -10, 0), Qt.AlignmentFlag.AlignVCenter | Qt.TextFlag.TextWordWrap, chu)
@@ -631,7 +679,8 @@ class DelegateKetQua(_DelegateNen):
         p.setClipping(False)
         p.setFont(_font(12))
         p.setPen(QColor(CHU_PHU))
-        p.drawText(r.adjusted(0, 12, 0, 0), Qt.AlignmentFlag.AlignVCenter, tom_tat.lower())
+        p.drawText(r.adjusted(0, 12, 0, 0), Qt.AlignmentFlag.AlignVCenter,
+                   QFontMetrics(_font(12)).elidedText(tom_tat.lower(), Qt.TextElideMode.ElideRight, r.width()))
         p.restore()
 
     def sizeHint(self, o: QStyleOptionViewItem, i) -> QSize:
@@ -687,14 +736,14 @@ class TheChiSo(QAbstractButton):
             vien, day = cham, 2
         else:
             vien, day = VIEN, 1
-        _ve_the(p, r, NEN_THE, vien, day, True)
+        _ve_the(p, r, NEN_THE, vien, day)
         tam = QPointF(r.x() + 38, r.center().y())
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QColor(nen))
         p.drawEllipse(tam, 20, 20)
         p.drawPixmap(QRectF(tam.x() - 10, tam.y() - 10, 20, 20), ve_anh(self._icon, chu, 20), QRectF(0, 0, 40, 40))
         chu_x = r.adjusted(70, 6, -10, -6)
-        p.setFont(_font(26, QFont.Weight.Bold))
+        p.setFont(_font_tieu_de(CO_TIEU_DE_MAN))
         p.setPen(QColor(chu if self.so else CHU))
         p.drawText(chu_x.adjusted(0, 0, 0, -22), Qt.AlignmentFlag.AlignVCenter, str(self.so))
         p.setFont(_font(13))
@@ -757,7 +806,7 @@ class HangSo(QWidget):
             return
         for nhan, so, mau in muc:
             o = QLabel(str(so))
-            o.setFont(_font(26, QFont.Weight.Bold))
+            o.setFont(_font_tieu_de(CO_TIEU_DE_MAN))
             o.setStyleSheet(f"color: {mau or CHU};")
             ten = QLabel(nhan)
             ten.setObjectName("phu")
@@ -770,12 +819,12 @@ class HangSo(QWidget):
 # ----- Khung màn hình -----
 def khung_man(w: QWidget, tieu_de: str, mo_ta: str) -> QVBoxLayout:
     lay = QVBoxLayout(w)
-    lay.setContentsMargins(32 - BONG, 28, 32 - BONG, 16)
+    lay.setContentsMargins(24 - BONG, 24, 24 - BONG, 16)  # lề trang 24px
     lay.setSpacing(0)
     tren = QHBoxLayout()
     tren.setContentsMargins(BONG, 0, BONG, 10)
     t = QLabel(tieu_de)
-    t.setFont(_font(24, QFont.Weight.Bold))
+    t.setFont(_font_tieu_de(CO_TIEU_DE_MAN))
     m = QLabel(mo_ta)
     m.setObjectName("moTa")
     m.setWordWrap(True)
@@ -809,11 +858,11 @@ def hang_nut(lay: QVBoxLayout, *nut: QWidget, trai: Sequence[QWidget] = ()) -> N
 # ----- Hộp thoại -----
 _KIEU_HOP = {
     "thuong": (NHAN, "thong_tin", NutChinh),
-    "thanh_cong": ("#17803D", "xong", NutChinh),
+    "thanh_cong": (TRANG_THAI["Thành công"][2], "xong", NutChinh),
     "canh_bao": (CAM, "canh_bao", NutChinh),
-    "loi": ("#D92D20", "loi", NutChinh),
-    "chay_that": ("#B54708", "canh_bao", NutChayThat),
-    "nguy_hiem": ("#D92D20", "canh_bao", NutNguyHiem),
+    "loi": (TRANG_THAI["Lỗi"][2], "loi", NutChinh),
+    "chay_that": (CHE_DO["that"]["chu"], "canh_bao", NutChayThat),
+    "nguy_hiem": (TRANG_THAI["Lỗi"][2], "canh_bao", NutChinh),  # nút xác nhận vẫn là nút chính; màu đỏ chỉ ở dải báo
 }
 
 
@@ -847,7 +896,7 @@ def _khung_hop(parent: QWidget | None, tieu_de: str, noi_dung: str, kieu: str, t
     cot = QVBoxLayout()
     cot.setSpacing(6)
     t = QLabel(tieu_de)
-    t.setFont(_font(18, QFont.Weight.Bold))
+    t.setFont(_font_tieu_de(CO_TIEU_DE_THE))
     t.setWordWrap(True)
     cot.addWidget(t)
     if noi_dung:
@@ -871,7 +920,7 @@ def _khung_hop(parent: QWidget | None, tieu_de: str, noi_dung: str, kieu: str, t
 
 
 def hop_xac_nhan(parent: QWidget | None, tieu_de: str, noi_dung: str, chi_tiet: list[tuple[str, str]], nut_dong_y: str,
-                 kieu: str = "thuong") -> bool:
+                 kieu: str = "thuong", nut_huy: str = "Quay lại") -> bool:
     """Nút mặc định và Esc đều là Quay lại: bấm Enter theo thói quen không làm gì nguy hiểm."""
     than = None
     if chi_tiet:
@@ -892,7 +941,7 @@ def hop_xac_nhan(parent: QWidget | None, tieu_de: str, noi_dung: str, chi_tiet: 
         luoi.setColumnStretch(1, 1)
         than.addWidget(khoi)
     d, nut = _khung_hop(parent, tieu_de, noi_dung, kieu, than)
-    quay = NutPhu("Quay lại")
+    quay = NutPhu(nut_huy)
     dong_y = _KIEU_HOP[kieu][2](nut_dong_y)
     dong_y.setAutoDefault(False)
     quay.setDefault(True)
@@ -915,7 +964,7 @@ def hop_thong_bao(parent: QWidget | None, tieu_de: str, noi_dung: str, kieu: str
 
 
 def hop_nhap(parent: QWidget | None, tieu_de: str, mo_ta: str, nhan_o: str, goi_y: str = "", nut_dong_y: str = "Đồng ý",
-             nut_bo_qua: str = "Bỏ qua") -> str | None:
+             nut_bo_qua: str = "Bỏ qua", hop_le: Callable[[str], bool] | None = None, bao_sai: str = "") -> str | None:
     """Hộp hỏi khi tool đang chờ người dùng; luôn nổi trên cửa sổ Chromium."""
     than = QVBoxLayout()
     than.setSpacing(6)
@@ -927,10 +976,14 @@ def hop_nhap(parent: QWidget | None, tieu_de: str, mo_ta: str, nhan_o: str, goi_
     nhan = QLabel(nhan_o)
     nhan.setObjectName("nhanO")
     o = QLineEdit()
-    o.setFont(font_so(16))
+    o.setFont(font_so(CO_CHU))
     o.setMinimumHeight(44)
     than.addWidget(nhan)
     than.addWidget(o)
+    sai = QLabel(bao_sai)
+    sai.setStyleSheet(f"color: {CHU_LOI}; font-size: 13px;")
+    sai.hide()
+    than.addWidget(sai)
     if goi_y:
         g = QLabel(goi_y)
         g.setObjectName("phu")
@@ -942,7 +995,13 @@ def hop_nhap(parent: QWidget | None, tieu_de: str, mo_ta: str, nhan_o: str, goi_
     bo_qua.setAutoDefault(False)
     dong_y.setDefault(True)
     dong_y.setEnabled(False)
-    o.textChanged.connect(lambda t: dong_y.setEnabled(bool(t.strip())))
+    def kiem(t: str) -> None:
+        co = bool(t.strip())
+        dung = co and (hop_le is None or hop_le(t))
+        dong_y.setEnabled(dung)
+        sai.setVisible(co and not dung and bool(bao_sai))
+
+    o.textChanged.connect(kiem)
     bo_qua.clicked.connect(d.reject)
     dong_y.clicked.connect(d.accept)
     nut.addWidget(bo_qua)

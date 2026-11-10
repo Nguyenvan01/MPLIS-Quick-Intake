@@ -16,12 +16,46 @@ from ..infra.config import BROWSER_PROFILE, SHOT_DIR, TRACE_DIR, Settings
 from .locators import Locators
 from .pages.chuyen_quyen import ChuyenQuyenPage
 from .pages.tiep_nhan import TiepNhanPage
-from .pages.tra_cuu import TraCuuPage
+from ..domain.chuan_hoa import ten_xa
+from .pages.tra_cuu import (API_TIM_THUA, API_TRA_HO_SO, TraCuuPage, chon_trung, doc_het_trang, doi_chieu_thua, gia_tri_doc,
+                            tham_so_tim_thua, tham_so_tra_ho_so)
 
 
 def da_dang_nhap(url: str, base_url: str) -> bool:
     u = urlparse(url)
     return u.hostname == urlparse(base_url).hostname and u.path.startswith("/dc")
+
+
+# Lệnh kiểm tra số phát hành mà chính wizard MPLIS gọi trước khi Lưu GCN. Chỉ đọc; kiểm tra trên toàn hệ thống, không phụ thuộc
+# tỉnh/xã, chạy được khi chưa có hồ sơ; bắt buộc có loại GCN; phân biệt khoảng trắng (đã thử trên MPLIS ngày 10/11/2026).
+API_KIEM_SO = "/dc/DangKyAjax/CheckExistThongTinGiayChungNhan"
+THAN_KIEM_SO = {"tinhId": 0, "huyenId": 0, "xaId": 0, "soVaoSo": "VP", "maGiayChungNhan": "", "giayChungNhanId": 0, "tinhHinhDangKyId": 0,
+                "hoSoTiepNhanId": "00000000-0000-0000-0000-000000000000", "loaiGiayChungNhanId": "97", "donViCap": "3"}
+JS_KIEM_SO = """async ([url, ds]) => {
+    const o = document.querySelector('input[name="__RequestVerificationToken"]');
+    const ra = [];
+    for (const b of ds) {
+        const r = await fetch(url, {method: 'POST', credentials: 'include', body: JSON.stringify(b), headers: {
+            'Content-Type': 'application/json; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest', '__RequestVerificationToken': o ? o.value : ''}});
+        ra.push(r.ok ? await r.json() : {success: false, status: r.status});
+    }
+    return ra;
+}"""
+
+
+# Danh sách người nhận bước Thụ lý mà hộp "Chọn người xử lý" của MPLIS tải (lấy từ trace). forceReload=true vì có lúc
+# trả thiếu (33 thay vì 125 tài khoản). Quy trình QD_1_012787_2 là quy trình mặc định đã chốt trong plan.md.
+API_NGUOI_XU_LY = "/dc/DangKyAjax/GetUserInOuHasPermissionOnActivity"
+THAN_NGUOI_XU_LY = {"schemaCode": "QD_1_012787_2", "state": "ThuLyHoSo", "tinhId": 33, "xaId": 12031, "forceReload": True}
+
+
+JS_GOI_FORM = """async ([url, ts]) => {
+    const o = document.querySelector('input[name="__RequestVerificationToken"]');
+    const r = await fetch(url, {method: 'POST', credentials: 'include', body: new URLSearchParams(ts), headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest',
+        '__RequestVerificationToken': o ? o.value : ''}});
+    return r.ok ? await r.json() : {success: false, status: r.status};
+}"""
 
 
 def _safe(s: str) -> str:
@@ -72,8 +106,52 @@ class PlaywrightMplis:
     def mo_ho_so(self, duong_dan: str) -> None:
         self.form.url_ho_so = duong_dan
 
+    def _goi_form(self, duong_dan: str, tham_so: list[tuple[str, str]]) -> dict:
+        if not da_dang_nhap(self.page.url, self.settings.mplis_url):
+            self.cho_dang_nhap()
+        kq = self.page.evaluate(JS_GOI_FORM, [urljoin(self.settings.mplis_url, duong_dan), tham_so])
+        if kq.get("success") is False or "data" not in kq:
+            raise RuntimeError(f"MPLIS không trả lời {duong_dan.rsplit('/', 1)[-1]}: {kq.get('status', '')}")
+        return kq
+
+    def _xa_id(self, hs: HoSo) -> int:
+        v = self.dm.anh_xa("xa", ten_xa(hs.dau.thua.dia_chi))
+        if not (v and v.isdigit()):
+            raise ValueError(f"Chưa có mã xã cho địa chỉ {hs.dau.thua.dia_chi!r}")
+        return int(v)
+
+    def _tra_ho_so(self, hs: HoSo, **loc: str) -> list[dict]:
+        xa = self._xa_id(hs)
+        return doc_het_trang(lambda s, n: self._goi_form(API_TRA_HO_SO, tham_so_tra_ho_so(xa, start=s, length=n, **loc)))
+
     def tim_trung(self, hs: HoSo) -> str | None:
-        return self.tra_cuu.tim(hs)
+        """Tra trùng bằng API, đọc đủ mọi trang; API lỗi thì tra qua giao diện như trước."""
+        try:
+            ds = self._tra_ho_so(hs, so_thua=str(hs.dau.thua.so_thua), so_to=str(hs.dau.thua.so_to))
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Tra trùng bằng API không được, chuyển sang giao diện: {type(e).__name__}: {str(e)[:150]}")
+            return self.tra_cuu.tim(hs)
+        return chon_trung(ds, hs)
+
+    def kiem_thua(self, hs: HoSo) -> str | None:
+        xa, t = self._xa_id(hs), hs.dau.thua
+        return doi_chieu_thua(doc_het_trang(lambda s, n: self._goi_form(API_TIM_THUA, tham_so_tim_thua(xa, str(t.so_thua), str(t.so_to), s, n))), hs)
+
+    def so_da_cap(self, ds: list[str]) -> set[str]:
+        if not da_dang_nhap(self.page.url, self.settings.mplis_url):
+            self.cho_dang_nhap()
+        kq = self.page.evaluate(JS_KIEM_SO, [urljoin(self.settings.mplis_url, API_KIEM_SO), [dict(THAN_KIEM_SO, soPhatHanh=s) for s in ds]])
+        if not all(x.get("success") for x in kq):
+            raise RuntimeError(f"MPLIS không trả lời lệnh kiểm tra số phát hành: {next(x for x in kq if not x.get('success'))}")
+        return {s for s, x in zip(ds, kq) if x.get("isExistSoPhatHanh")}
+
+    def ds_nguoi_xu_ly(self) -> dict[str, str]:
+        if not da_dang_nhap(self.page.url, self.settings.mplis_url):
+            self.cho_dang_nhap()
+        kq = self.page.evaluate(JS_KIEM_SO, [urljoin(self.settings.mplis_url, API_NGUOI_XU_LY), [THAN_NGUOI_XU_LY]])[0]
+        if not kq.get("success"):
+            raise RuntimeError(f"MPLIS không trả danh sách người xử lý: {kq}")
+        return {x["UserName"]: (x.get("FullName") or "").strip() for x in kq.get("value") or [] if x.get("UserName")}
 
     def mo_form(self) -> None:
         self.form.mo()
@@ -107,7 +185,12 @@ class PlaywrightMplis:
         self.wizard.hoan_tat()
 
     def doc(self, hs: HoSo, ma_ho_so: str) -> dict[str, str]:
-        return self.tra_cuu.doc(hs, ma_ho_so)
+        try:
+            kq = self._tra_ho_so(hs, so_bien_nhan=ma_ho_so)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Tra cứu lại bằng API không được, chuyển sang giao diện: {type(e).__name__}: {str(e)[:150]}")
+            return self.tra_cuu.doc(hs, ma_ho_so)
+        return gia_tri_doc(kq[0]) if len(kq) == 1 else {}
 
     def ve_trang_dau(self) -> None:
         self.page.goto(self.settings.mplis_url)

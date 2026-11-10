@@ -13,7 +13,8 @@ from tiep_nhan.mplis.fake import FakeMplis
 @pytest.fixture
 def ho_so(mau):
     rows, _ = kiem_tra_file(read_phieu(mau))
-    return gom(rows)
+    # chạy thật bắt buộc có số phát hành (wizard cần); file mẫu cố ý để trống ở vài dòng
+    return [h if h.dau.thua.ma_phat_hanh else _voi_so(h, f"AA {i:08d}") for i, h in enumerate(gom(rows), 1)]
 
 
 @pytest.fixture
@@ -228,3 +229,158 @@ def test_ghi_thoi_gian_tung_buoc(ho_so, store):
     tg = [x for x in dong if x.startswith("Thời gian")]
     assert len(tg) == 1 and ho_so[0].key in tg[0]
     assert all(b in tg[0] for b in ("mo_form", "dien", "luu", "chon_gcn", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "doc"))
+
+
+def _voi_so(hs, so):
+    d = hs.dong[0]
+    return hs.model_copy(update={"dong": (d.model_copy(update={"thua": d.thua.model_copy(update={"ma_phat_hanh": so})}),) + hs.dong[1:]})
+
+
+def _mo_ta(hs):
+    return f"tờ {hs.dau.thua.so_to}, thửa {hs.dau.thua.so_thua}"
+
+
+def test_so_da_cap_thi_hoi_so_moi_truoc_khi_tao_va_wizard_dung_so_moi(ho_so, store):
+    ds = [_voi_so(ho_so[0], "AA 1"), _voi_so(ho_so[1], "AA 2"), ho_so[2]]
+    hoi = []
+    port = FakeMplis(so_da_cap_san={"AA 1"}, hoi_so_moi=lambda mo_ta, so: hoi.append((mo_ta, so)) or "ab 9")
+    run(ds, port, store)
+    assert hoi == [(_mo_ta(ds[0]), "AA 1")]
+    assert port.so_da_quet == ["AA 1", "AA 2", ho_so[2].dau.thua.ma_phat_hanh, "AB 9"]  # quét cả lô trước, rồi kiểm số mới
+    assert port.so_dung == {ds[0].key: "AB 9", ds[1].key: "AA 2", ds[2].key: ho_so[2].dau.thua.ma_phat_hanh}
+    assert all(store.get(h.key).trang_thai is TrangThai.THANH_CONG for h in ds)
+
+
+def test_so_da_cap_ma_bo_qua_thi_khong_tao_gi(ho_so, store):
+    ds = [_voi_so(ho_so[0], "AA 1")]
+    port = FakeMplis(so_da_cap_san={"AA 1"}, hoi_so_moi=lambda *_: None)
+    ev = run(ds, port, store)
+    bg = store.get(ds[0].key)
+    assert bg.trang_thai is TrangThai.CAN_KIEM_TRA and bg.ghi_chu == 'Cần kiểm tra lại số phát hành "AA 1"' and not bg.ma_ho_so
+    assert port.so_lan_luu == 0 and [e[1] for e in ev] == ["Cần kiểm tra"]
+
+
+def test_so_moi_cung_da_cap_thi_hoi_lai(ho_so, store):
+    ds = [_voi_so(ho_so[0], "AA 1")]
+    tra_loi = iter(["AB 1", "AB 2"])
+    port = FakeMplis(so_da_cap_san={"AA 1", "AB 1"}, hoi_so_moi=lambda *_: next(tra_loi))
+    run(ds, port, store)
+    assert port.so_dung[ds[0].key] == "AB 2" and store.get(ds[0].key).trang_thai is TrangThai.THANH_CONG
+
+
+def test_chay_thu_khong_quet_so_phat_hanh(ho_so, store):
+    port = FakeMplis(so_da_cap_san={"AA 1"})
+    run([_voi_so(ho_so[0], "AA 1")], port, store, dry=True)
+    assert port.so_da_quet == []
+
+
+def test_khong_quet_duoc_van_chay_tiep(ho_so, store):
+    ds = [_voi_so(ho_so[0], "AA 1")]
+    port = FakeMplis(loi_quet=True)
+    run(ds, port, store)
+    assert store.get(ds[0].key).trang_thai is TrangThai.THANH_CONG
+
+
+def test_ho_so_da_co_ma_khong_quet_lai(ho_so, store):
+    ds = [_voi_so(ho_so[0], "AA 1")]
+    store.mark(ds[0].key, TrangThai.DA_CHUYEN_XU_LY, "dở", "HS-X")
+    port = FakeMplis(so_da_cap_san={"AA 1"})
+    run(ds, port, store)
+    assert port.so_da_quet == []
+
+
+def test_xoa_lich_su_lo_khong_xoa_trang_thai_ho_so(store):
+    store.ghi_lo("a.xlsx", "Chạy thử", 1, "1 Chạy thử", ["k1"])
+    store.ghi_lo("b.xlsx", "Chạy thật", 1, "1 Thành công", ["k2"])
+    store.mark("k2", TrangThai.THANH_CONG, "xong", "HS-1")
+    cu = store.ds_lo()
+    store.xoa_lo(next(x["id"] for x in cu if x["file"] == "b.xlsx"))
+    assert [x["file"] for x in store.ds_lo()] == ["a.xlsx"]
+    assert store.get("k2").trang_thai is TrangThai.THANH_CONG  # trạng thái giữ lại để không tạo trùng
+    store.xoa_het_lo()
+    assert store.ds_lo() == [] and store.get("k2").ma_ho_so == "HS-1"
+
+
+
+class _FakeGhiMoc(FakeMplis):
+    """Ghi lại trạng thái trong store ngay lúc wizard bắt đầu."""
+    store = None
+    moc: list = []
+
+    def dien_chuyen_quyen(self, hs, ma_ho_so):
+        self.moc.append(self.store.get(hs.key).trang_thai)
+        super().dien_chuyen_quyen(hs, ma_ho_so)
+
+
+def test_chay_thu_khong_dong_toi_ho_so_dang_tao(ho_so, store):
+    port = FakeMplis(ngat_sau_luu={ho_so[0].key})
+    run(ho_so[:1], port, store)
+    assert store.get(ho_so[0].key).trang_thai is TrangThai.DANG_TAO
+    port.goi.clear()
+    ev = run(ho_so[:1], port, store, dry=True)
+    assert port.goi == [] and store.get(ho_so[0].key).trang_thai is TrangThai.DANG_TAO
+    assert ev[-1][1] == "Bỏ qua"
+
+
+def test_chay_thu_thay_trung_khong_ghi_trang_thai(ho_so, store):
+    port = FakeMplis()
+    run(ho_so[:1], port, store)
+    store.reset(ho_so[0].key)
+    ev = run(ho_so[:1], port, store, dry=True)
+    assert ev[-1][1] == "Đã có sẵn" and store.get(ho_so[0].key).trang_thai is TrangThai.CHO
+
+
+def test_bat_dau_wizard_da_ghi_moc_de_bi_ngat_khong_lam_lai(ho_so, store):
+    port = _FakeGhiMoc()
+    port.store, port.moc = store, []
+    run(ho_so[:1], port, store)
+    assert port.moc == [TrangThai.DANG_HOAN_TAT]
+
+
+def test_thieu_truong_wizard_bat_buoc_thi_khong_tao(ho_so, store):
+    d = ho_so[0].dong[0]
+    thieu = ho_so[0].model_copy(update={"dong": (d.model_copy(update={"nha": d.nha.model_copy(update={"dt_xay_dung": None})}),)})
+    port = FakeMplis()
+    ev = run([thieu], port, store)
+    bg = store.get(thieu.key)
+    assert port.so_lan_luu == 0 and bg.trang_thai is TrangThai.LOI and "Diện tích xây dựng" in bg.ghi_chu
+    assert ev[-1][1] == "Lỗi"
+
+
+class _FakeDocLech(FakeMplis):
+    def doc(self, hs, ma_ho_so):
+        return dict(super().doc(hs, ma_ho_so), cccd_nop="001234567890")
+
+
+def test_ghi_chu_lech_khong_luu_cccd_day_du(ho_so, store):
+    port = _FakeDocLech()
+    run(ho_so[:1], port, store)
+    bg = store.get(ho_so[0].key)
+    assert bg.trang_thai is TrangThai.CAN_KIEM_TRA and "001234567890" not in bg.ghi_chu and "0012•••890" in bg.ghi_chu
+
+
+def test_tai_khoan_khac_chu_hoa_van_la_cua_minh(ho_so, store):
+    port = FakeMplis(tai_khoan_chuyen="LtMung.NNMT")
+    Runner(ho_so[:1], port, store, RunOptions(dry_run=False, tai_khoan=" ltmung.nnmt ")).run()
+    assert "dien_chuyen_quyen" in port.goi and store.get(ho_so[0].key).trang_thai is TrangThai.THANH_CONG
+
+
+def test_quet_thua_truoc_khi_tao_thua_sai_thi_khong_tao(ho_so, store):
+    port = FakeMplis(loi_thua={ho_so[0].key: "Diện tích trên MPLIS (107,5) khác Excel (84)"})
+    ev = run(ho_so, port, store)
+    bg = store.get(ho_so[0].key)
+    assert bg.trang_thai is TrangThai.LOI and "107,5" in bg.ghi_chu and port.so_lan_luu == 2
+    assert [e[1] for e in ev if e[0] == ho_so[0].key] == ["Lỗi"]
+    assert all(store.get(h.key).trang_thai is TrangThai.THANH_CONG for h in ho_so[1:])
+
+
+def test_khong_quet_duoc_thua_van_chay_nhu_cu(ho_so, store):
+    port = FakeMplis(loi_kiem_thua=True)
+    run(ho_so, port, store)
+    assert port.so_lan_luu == 3
+
+
+def test_chay_thu_khong_quet_thua(ho_so, store):
+    port = FakeMplis(loi_thua={ho_so[0].key: "Không thấy thửa"})
+    run(ho_so, port, store, dry=True)
+    assert store.get(ho_so[0].key).trang_thai is TrangThai.CHO

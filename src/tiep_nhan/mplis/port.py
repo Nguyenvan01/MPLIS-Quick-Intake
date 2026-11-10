@@ -22,6 +22,9 @@ class MplisPort(Protocol):
 
     def cho_dang_nhap(self) -> None: ...                       # người dùng tự đăng nhập (captcha, Authenticator)
     def tim_trung(self, hs: HoSo) -> str | None: ...          # mã hồ sơ nếu MPLIS đã có (BR-04)
+    def so_da_cap(self, ds: list[str]) -> set[str]: ...        # các số phát hành MPLIS báo đã cấp (chỉ đọc)
+    def ds_nguoi_xu_ly(self) -> dict[str, str]: ...            # tài khoản -> họ tên người nhận bước Thụ lý (chỉ đọc)
+    def kiem_thua(self, hs: HoSo) -> str | None: ...           # thửa không có hoặc lệch diện tích trên MPLIS; None là khớp (chỉ đọc)
     def mo_form(self) -> None: ...                             # mở form tiếp nhận trống
     def dien(self, hs: HoSo) -> None: ...                      # điền, KHÔNG lưu
     def chup(self, key: str) -> str: ...                       # ảnh chụp form, trả đường dẫn

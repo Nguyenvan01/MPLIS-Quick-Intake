@@ -160,3 +160,10 @@ def test_cot_nguoi_nop_khong_khop_nguoi_nhan_thi_chan():
 def test_cot_nguoi_nop_trong_thi_giu_mac_dinh():
     dong, _ = kiem_tra_dong(_raw(6, ong_ho_ten="Trần Chồng", ong_cccd=NAM))
     assert dong.nguoi_nop.ho_ten == "Trần Chồng" and not dong.nguoi_nop_excel
+
+
+@pytest.mark.parametrize("so, mong", [("AA 12345678", True), ("aa12345678", True), (" ab  12345678 ", True), ("TEST0001", False),
+                                      ("AA 12312312323", False), ("9912323", False), ("AA 1234567", False), ("", False), (None, False)])
+def test_so_phat_hanh_hop_le_hai_chu_tam_so(so, mong):
+    from tiep_nhan.domain.chuan_hoa import so_phat_hanh_hop_le
+    assert so_phat_hanh_hop_le(so) is mong
