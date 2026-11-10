@@ -191,3 +191,23 @@ def test_trung_to_thua_trong_file_thi_loai_dong_sau_va_chi_canh_bao():
     trung = [v for v in van_de if v.ma == "BR-03"]
     assert len(trung) == 1 and trung[0].muc == "canh_bao" and trung[0].excel_row == 7
     assert "3/3549" in trung[0].noi_dung and "dòng 6" in trung[0].noi_dung and "đã loại" in trung[0].noi_dung
+
+
+def test_dia_chi_thua_lam_sach_va_tach_xa():
+    from tiep_nhan.domain.models import ThuaDat
+    t = ThuaDat(so_to=3, so_thua=3222, dia_chi="VTĐ2-39, , Khu đô thị đại An, xã Nghĩa Trụ, tỉnh Hưng Yên ")
+    assert t.dia_chi == "VTĐ2-39, Khu đô thị đại An, xã Nghĩa Trụ, tỉnh Hưng Yên"   # địa chỉ tài sản (nhà)
+    assert t.dia_chi_thua_dat == "xã Nghĩa Trụ, tỉnh Hưng Yên"                      # địa chỉ thửa trên GCN
+    assert ThuaDat(so_to=1, so_thua=1, dia_chi="Số 5, Phường Mẫu, Hà Nội").dia_chi_thua_dat == "Phường Mẫu, Hà Nội"
+    assert ThuaDat(so_to=1, so_thua=1, dia_chi="Khu A, Hưng Yên").dia_chi_thua_dat == "Khu A, Hưng Yên"  # không có xã/phường: giữ nguyên
+
+
+def test_so_tang_doc_tu_chu():
+    from tiep_nhan.domain.models import NhaO
+    assert NhaO(so_tang="5 tầng").so_tang == 5 and NhaO(so_tang=5).so_tang == 5
+
+
+@pytest.mark.parametrize("raw,loai", [("CC:001063000001", "Căn cước"), ("cc: 001063000001", "Căn cước"), ("001063000001", "CCCD")])
+def test_tien_to_cc_la_can_cuoc(raw, loai):
+    dong, _ = _dong(ong_ho_ten="Người Nhận", ong_cccd=raw)
+    assert dong.nguoi[0].cccd == "001063000001" and dong.nguoi[0].loai_giay_to == loai

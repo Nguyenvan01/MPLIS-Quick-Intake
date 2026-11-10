@@ -70,6 +70,9 @@ class DanhMuc:
                 out += [VanDe(excel_row=d.excel_row, muc="loi", ma="BR-05",
                               noi_dung=f"[{bang}] đang trống, wizard chuyển quyền bắt buộc phải có")
                         for bang in BAT_BUOC if not TRUONG[bang](d)]
+                out += [VanDe(excel_row=d.excel_row, muc="loi", ma="BR-05",  # wizard điền thẳng hai ô diện tích của nhà
+                              noi_dung=f"[{ten}] đang trống, wizard chuyển quyền bắt buộc phải có")
+                        for ten in ("dt_xay_dung", "dt_san") if not getattr(d.nha, ten)]
         for (bang, gv), rows in self.chua_anh_xa(ho_so).items():
             out.append(VanDe(excel_row=rows[0], muc="loi", ma="BR-05",
                              noi_dung=f"[{bang}] '{gv}' chưa ánh xạ sang danh mục MPLIS (dòng {', '.join(map(str, rows))})"))

@@ -146,15 +146,37 @@ class ChuyenQuyenPage(TiepNhanPage):
         ten = self._o("o_ho_ten", f)
         ten.fill(n.ho_ten)
         self._dat(self._o("o_nam_sinh", f), str(n.nam_sinh or ""))  # fill() chỉ giữ chữ số cuối
+        if n.loai_giay_to == "Căn cước":
+            self._chon_loai_giay_to(f, self.L.data[self.P]["loai_can_cuoc"])
         self._o("o_so_giay_to", f).fill(n.cccd or "")
         self._o("o_dia_chi", f).fill(n.dia_chi or "")
         nam = self._o("o_gioi_tinh", f)
         if nam.is_checked() != (n.gioi_tinh == "Nam"):
             nam.click()
-        self._o("nut_luu", f).click()
-        self._dong_y_neu_trung_giay_to()
+        # MPLIS kiểm CCCD ngay khi Lưu; chỉ khi đã có trong danh bạ mới hiện hộp "Giấy tờ tùy thân đã tồn tại" nên chỉ chờ hộp khi đó
+        try:
+            with self.page.expect_response(lambda r: "CheckCaNhanIsExist" in r.url, timeout=15_000) as tl:
+                self._o("nut_luu", f).click()
+            ton_tai = (tl.value.json().get("Value") or {}).get("IsExist")
+        except PwTimeout:
+            ton_tai = True  # không thấy lệnh kiểm (vd không có CCCD): chờ hộp như cũ
+        if ton_tai:
+            self._dong_y_neu_trung_giay_to()
         expect(self._hien("modal_ca_nhan")).to_have_count(0)
         self._khong_co_hop("lưu người nhận")
+
+    def _chon_loai_giay_to(self, f: Locator, ten: str) -> None:
+        """Chọn theo đúng chữ trong danh sách (ô có thể bọc select2 nên đặt giá trị rồi báo change như người chọn)."""
+        o = self._el("sel_loai_giay_to", f).first
+        da_chon = o.evaluate("""(e, t) => {
+            const op = [...e.options].find(x => x.text.trim() === t);
+            if (!op) return null;
+            if (window.jQuery) jQuery(e).val(op.value).trigger('change');
+            else { e.value = op.value; e.dispatchEvent(new Event('change', { bubbles: true })); }
+            return e.options[e.selectedIndex].text.trim();
+        }""", ten)
+        if da_chon != ten:
+            raise RuntimeError(f"Không chọn được loại giấy tờ '{ten}' trên MPLIS")
 
     def _dong_y_neu_trung_giay_to(self) -> None:
         hop = self._hien("hop").filter(has_text="Giấy tờ tùy thân đã tồn tại")
@@ -196,6 +218,7 @@ class ChuyenQuyenPage(TiepNhanPage):
         o = self._o("o_thoi_han", m)
         o.fill(v)
         expect(o).to_have_value(v)
+        self._dia_chi_chi_tiet(m, d.thua.dia_chi_thua_dat)  # thửa chỉ ghi "xã…, tỉnh…" để GCN in được địa chỉ tài sản
         self._el("nut_luu_thua", m).click()
         expect(self._hien("modal_tai_san")).to_have_count(0)
         self._khong_co_hop("lưu thời hạn")
@@ -217,14 +240,24 @@ class ChuyenQuyenPage(TiepNhanPage):
         o.press_sequentially(f"{d.nha.dt_san:g}", delay=120)  # fill() làm ô này trống
         self._o("o_so_nha", m).click()
         expect(o).to_have_value(re.compile(rf"^{re.escape(f'{d.nha.dt_san:g}')}"))
+        if d.nha.so_tang:
+            self._o("o_so_tang", m).fill(str(d.nha.so_tang))
+        self._dia_chi_chi_tiet(m, d.thua.dia_chi or "")  # địa chỉ tài sản đủ tên căn, như cột Đường
+        self._el("nut_luu_nha", m).click()
+        expect(self._hien("modal_tai_san")).to_have_count(0)
+        self._khong_co_hop("lưu nhà")
+
+    def _dia_chi_chi_tiet(self, m: Locator, gia_tri: str) -> None:
+        """Hộp thửa và hộp nhà dùng chung khối Địa chỉ: mở, đánh dấu địa chỉ chính, ghi Địa chỉ chi tiết."""
         self._el("mo_dia_chi", m).first.click()
         chinh = self._o("o_dia_chi_chinh", m)
         expect(chinh).to_be_visible()
         if not chinh.is_checked():
             chinh.click()
-        self._el("nut_luu_nha", m).click()
-        expect(self._hien("modal_tai_san")).to_have_count(0)
-        self._khong_co_hop("lưu nhà")
+        if gia_tri:
+            o = self._o("o_dia_chi", m)
+            o.fill(gia_tri)
+            expect(o).to_have_value(gia_tri)
 
     def _luu_dang_ky(self) -> None:
         w = self._wiz()

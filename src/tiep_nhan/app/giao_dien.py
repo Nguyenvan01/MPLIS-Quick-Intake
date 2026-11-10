@@ -40,6 +40,7 @@ CHU_MO = "#8A8A8A"                                                              
 FONT_TIEU_DE = ["Be Vietnam Pro", "Segoe UI", ".AppleSystemUIFont", "Arial"]
 FONT_NOI_DUNG = ["Be Vietnam Pro", "Segoe UI", ".AppleSystemUIFont", "Arial"]
 CO_TIEU_DE_MAN, CO_TIEU_DE_THE, CO_CHU, CO_NHAN, CO_NHO = 30, 18, 14, 13, 12   # đúng 5 cỡ chữ
+TY_LE = 0.75  # cả app thu nhỏ theo tỉ lệ này (QT_SCALE_FACTOR), riêng thanh bên phóng ngược lại để giữ cỡ cũ (người dùng 10/11/2026)
 
 # trạng thái -> (chữ, nền, chấm); chữ trên nền đạt WCAG AA >= 4.5:1 (đo trong tests/test_giao_dien.py)
 TRANG_THAI = {
@@ -473,7 +474,7 @@ def _ve_the(p: QPainter, r: QRectF, nen: str, vien: str | None, day: float, dut:
 class The(QFrame):
     """Thẻ nội dung dạng inset. vien=None: không viền; bong giữ để gọi cũ không lỗi, hệ thiết kế không dùng bóng."""
 
-    def __init__(self, *noi_dung: QWidget | QLayout, dem: int = 24, bong: bool = False, nen: str = NEN_THE, vien: str | None = None,
+    def __init__(self, *noi_dung: QWidget | QLayout, dem: int = 24, bong: bool = False, nen: str = NEN_APP, vien: str | None = VIEN,
                  day: float = 1, dut: bool = False):
         super().__init__()
         self._kieu = (nen, vien, day, dut)
@@ -790,7 +791,7 @@ class TheChiSo(QAbstractButton):
             vien, day = cham, 2
         else:
             vien, day = VIEN, 1
-        _ve_the(p, r, NEN_THE, vien, day)
+        _ve_the(p, r, NEN_APP, vien, day)
         tam = QPointF(r.x() + 38, r.center().y())
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QColor(nen))

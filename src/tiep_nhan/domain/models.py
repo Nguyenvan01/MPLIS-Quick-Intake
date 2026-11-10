@@ -18,6 +18,7 @@ class Nguoi(_Base):
     ho_ten: str = Field(min_length=2)
     nam_sinh: int | None = Field(default=None, ge=1900)
     cccd: str | None = Field(default=None, pattern=r"^\d{12}$")
+    loai_giay_to: Literal["CCCD", "Căn cước"] = "CCCD"  # Excel ghi "CC:0123…" là thẻ Căn cước (cấp từ 01/07/2024)
     dia_chi: str | None = None
 
     @field_validator("nam_sinh", mode="before")
@@ -55,6 +56,20 @@ class ThuaDat(_Base):
     @classmethod
     def _mph(cls, v):
         return chuan_ma_phat_hanh(v)
+
+    @field_validator("dia_chi", mode="before")
+    @classmethod
+    def _dia_chi(cls, v):
+        """Cột Đường hay có đoạn trống (", ,") và khoảng trắng thừa: bỏ đi để GCN in gọn."""
+        if v is None:
+            return None
+        return ", ".join(p for p in (" ".join(x.split()) for x in str(v).split(",")) if p) or None
+
+    @property
+    def dia_chi_thua_dat(self) -> str:
+        """Địa chỉ thửa trên GCN chỉ gồm xã/phường trở đi; trùng địa chỉ tài sản thì MPLIS không in địa chỉ tài sản."""
+        m = re.search(r"(?i)\b(xã|phường|thị trấn)\b.*$", self.dia_chi or "")
+        return m.group(0) if m else (self.dia_chi or "")
 
 
 class NhaO(_Base):

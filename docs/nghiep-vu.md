@@ -30,8 +30,8 @@ Dòng tiêu đề là dòng có ô `STT` (file mẫu: dòng 5), nhóm Ông/Bà �
 | Căn cứ | Xác nhận Vinhomes | — | Số phụ lục, ngày |
 | Người nhận – Ông | Họ và tên, Năm sinh, CCCD, Địa chỉ | Ông hoặc Bà | CCCD dạng chữ, 12 số |
 | Người nhận – Bà | Họ và tên, Năm sinh, CCCD, Địa chỉ | Ông hoặc Bà | |
-| Thửa đất | Thửa đất, Số tờ, Diện tích (m2), Mã phát hành, Thời hạn sử dụng đất, Đường | Tờ, thửa | Dấu phẩy thập phân |
-| Nhà ở | Loại nhà, Cấp nhà, DT xây dựng, DT sàn, Số tầng, Năm hoàn công, Kết cấu | — | "5 tầng" → 5 |
+| Thửa đất | Thửa đất, Số tờ, Diện tích (m2), Mã phát hành, Thời hạn sử dụng đất, Đường | Tờ, thửa | Dấu phẩy thập phân. Đường là địa chỉ tài sản đầy đủ (tên căn, khu, xã, tỉnh): ghi nguyên cho nhà; địa chỉ thửa trên GCN chỉ lấy phần "xã/phường … trở đi" (trùng địa chỉ tài sản thì MPLIS không in địa chỉ tài sản). Đoạn trống ", ," tự bỏ |
+| Nhà ở | Loại nhà, Cấp nhà, DT xây dựng, DT sàn, Số tầng, Năm hoàn công, Kết cấu | — | "5 tầng" → 5, điền vào ô Số tầng của nhà |
 | Xử lý | Mẫu nhà, Phân loại đường, Cán bộ XL, Mã đầu vào | Mã đầu vào | |
 
 ## Quy tắc nghiệp vụ
@@ -44,7 +44,7 @@ Chuẩn chung: Excel là nguồn gốc, tool chỉ chặn khi không thể nhậ
 | BR-02 | CCCD 12 số; chữ số thứ 4 khớp giới tính theo cột (Ông chẵn, Bà lẻ), số 5–6 khớp năm sinh. CCCD 11 số (ô đã mất số 0 đầu) thì tự thêm số 0 nếu mã tỉnh hợp lệ và số 5–6 khớp năm sinh; không khớp hoặc thiếu năm sinh thì vẫn là lỗi | Cảnh báo (sai định dạng: Lỗi) | `domain/chuan_hoa.py` |
 | BR-03 | Tờ, thửa nguyên dương; cặp tờ–thửa và số phát hành không lặp trong file. Trùng tờ–thửa: giữ dòng đầu, loại các dòng sau khỏi lô và báo ngay khi nạp file (cảnh báo, không chặn). Trùng số phát hành: lỗi chặn | Lỗi / Cảnh báo | `domain/rules.py` |
 | BR-04 | Không tạo nếu MPLIS đã có hồ sơ cùng tờ, thửa và người nộp là một trong những người nhận (theo CCCD); ghi lại số biên nhận có sẵn. Hồ sơ cùng thửa của người khác (lần chuyển nhượng trước) không tính là trùng | — | `core/runner.py`, `mplis/pages/tra_cuu.py` |
-| BR-05 | Giá trị danh mục (loại nhà, cấp nhà, kết cấu, thời hạn, xã trong địa chỉ thửa) phải ánh xạ được sang MPLIS. Loại nhà, cấp nhà, kết cấu, thời hạn không được trống (thời hạn lấy mặc định ở Cài đặt nếu Excel trống) | Lỗi | `domain/danh_muc.py` |
+| BR-05 | Giá trị danh mục (loại nhà, cấp nhà, kết cấu, thời hạn, xã trong địa chỉ thửa) phải ánh xạ được sang MPLIS. Loại nhà, cấp nhà, kết cấu, thời hạn, diện tích xây dựng, diện tích sàn không được trống (thời hạn lấy mặc định ở Cài đặt nếu Excel trống) | Lỗi | `domain/danh_muc.py` |
 | BR-06 | Thiếu Mã phát hành, Thời hạn, Mẫu nhà, Phân loại đường, Cán bộ XL | Cảnh báo | `domain/rules.py` |
 | BR-07 | Chỉ ghi Thành công khi tra cứu lại thấy hồ sơ và dữ liệu khớp Excel | — | `mplis/port.py::so_sanh` |
 | BR-08 | Ô tiêu đề gộp lấn xuống dữ liệu, hoặc dòng không có STT/tờ/thửa: báo, không tự đoán | Cảnh báo | `infra/excel_in.py` |

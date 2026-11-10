@@ -439,3 +439,10 @@ def test_log_loi_khong_ghi_ho_ten(ho_so, store):
     finally:
         logger.remove(sink)
     assert dong and not any(n.ho_ten in m for m in dong for n in ho_so[0].dau.nguoi)
+
+
+def test_ghi_chu_loi_khong_kem_ten_lop_loi(ho_so, store):
+    ev = []
+    Runner(ho_so[:1], FakeMplis(loi_chon_gcn={ho_so[0].key}), store, RunOptions(dry_run=False), on_event=lambda *a: ev.append(a)).run()
+    loi = [a[2] for a in ev if a[1] == "Lỗi"]
+    assert loi and loi[0].startswith("lỗi giả lập khi chọn GCN")
