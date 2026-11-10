@@ -41,7 +41,7 @@ Chuẩn chung: Excel là nguồn gốc, tool chỉ chặn khi không thể nhậ
 | Mã | Quy tắc | Mức | Code |
 | --- | --- | --- | --- |
 | BR-01 | Mỗi hồ sơ có ít nhất một người nhận có họ tên | Lỗi | `domain/rules.py` |
-| BR-02 | CCCD 12 số; chữ số thứ 4 khớp giới tính theo cột (Ông chẵn, Bà lẻ), số 5–6 khớp năm sinh | Cảnh báo (sai định dạng: Lỗi) | `domain/chuan_hoa.py` |
+| BR-02 | CCCD 12 số; chữ số thứ 4 khớp giới tính theo cột (Ông chẵn, Bà lẻ), số 5–6 khớp năm sinh. CCCD 11 số (ô đã mất số 0 đầu) thì tự thêm số 0 nếu mã tỉnh hợp lệ và số 5–6 khớp năm sinh; không khớp hoặc thiếu năm sinh thì vẫn là lỗi | Cảnh báo (sai định dạng: Lỗi) | `domain/chuan_hoa.py` |
 | BR-03 | Tờ, thửa nguyên dương; cặp tờ–thửa và số phát hành không lặp trong file. Trùng tờ–thửa: giữ dòng đầu, loại các dòng sau khỏi lô và báo ngay khi nạp file (cảnh báo, không chặn). Trùng số phát hành: lỗi chặn | Lỗi / Cảnh báo | `domain/rules.py` |
 | BR-04 | Không tạo nếu MPLIS đã có hồ sơ cùng tờ, thửa và người nộp là một trong những người nhận (theo CCCD); ghi lại số biên nhận có sẵn. Hồ sơ cùng thửa của người khác (lần chuyển nhượng trước) không tính là trùng | — | `core/runner.py`, `mplis/pages/tra_cuu.py` |
 | BR-05 | Giá trị danh mục (loại nhà, cấp nhà, kết cấu, thời hạn, xã trong địa chỉ thửa) phải ánh xạ được sang MPLIS. Loại nhà, cấp nhà, kết cấu, thời hạn không được trống (thời hạn lấy mặc định ở Cài đặt nếu Excel trống) | Lỗi | `domain/danh_muc.py` |

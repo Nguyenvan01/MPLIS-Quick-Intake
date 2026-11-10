@@ -128,6 +128,18 @@ def test_cccd_sai_van_bao_loi(raw):
         to_cccd(raw)
 
 
+def test_cccd_11_so_mat_so_0_dau_tu_bu_khi_khop_nam_sinh():
+    # ô Văn bản nhưng đã mất số 0 đầu từ trước (file khách 10/11/2026)
+    cccd, notes = to_cccd("01163000001", nam_sinh=1963)
+    assert cccd == "001163000001" and notes
+
+
+@pytest.mark.parametrize("raw, nam", [("01163000001", 1970), ("01163000001", None), ("99163000001", 1963)])
+def test_cccd_11_so_khong_khop_van_bao_loi(raw, nam):
+    with pytest.raises(ValueError):
+        to_cccd(raw, nam_sinh=nam)
+
+
 def test_nam_hoan_cong_tuong_lai_giu_nhu_excel():
     dong, issues = _dong(ong_ho_ten="Người Nhận", ong_cccd=NAM, nam_hoan_cong=2028)
     assert dong.nha.nam_hoan_cong == 2028
