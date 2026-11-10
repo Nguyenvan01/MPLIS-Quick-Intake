@@ -55,8 +55,8 @@ def _nguoi(nam=1962):
     return Nguoi(vai_tro="Ông", ho_ten="Nguyễn Văn A", nam_sinh=nam, cccd=NAM)
 
 
-def _dong(ten, nam):
-    return ["", "123", ten, "Nam", nam, "Địa chỉ"]
+def _dong(ten, nam, dia_chi="Địa chỉ", ma="123"):
+    return ["", ma, ten, "Nam", nam, dia_chi]
 
 
 def test_chon_ban_ghi_khop_ten_va_nam_sinh():
@@ -67,8 +67,13 @@ def test_nam_sinh_dang_ngay_day_du():
     assert chon_ca_nhan([_dong("Nguyễn Văn A", "05/03/1962"), _dong("Nguyễn Văn A", "1970")], _nguoi()) == 0
 
 
-def test_nhieu_ban_ghi_cung_khop_thi_khong_chon():
-    assert chon_ca_nhan([_dong("Nguyễn Văn A", "1962"), _dong("Nguyễn Văn A", "1962")], _nguoi()) is None
+def test_nhieu_ban_ghi_khop_nhung_khac_dia_chi_thi_khong_chon():
+    assert chon_ca_nhan([_dong("Nguyễn Văn A", "1962"), _dong("Nguyễn Văn A", "1962", "Nơi khác", "124")], _nguoi()) is None
+
+
+def test_mot_nguoi_bi_nhap_trung_thi_chon_ban_dau():
+    # danh bạ MPLIS có 3 bản ghi giống hệt nhau, chỉ khác mã (file khách 10/11/2026)
+    assert chon_ca_nhan([_dong("Nguyễn Văn A", "1962", ma=m) for m in ("1", "2", "3")], _nguoi()) == 0
 
 
 def test_khong_ban_ghi_nao_khop_thi_khong_chon():

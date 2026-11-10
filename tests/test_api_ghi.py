@@ -101,8 +101,9 @@ def test_chon_ban_ghi_ca_nhan(hs):
     dung = {"caNhanId": 5, "hoTen": n.ho_ten.lower(), "namSinh": n.nam_sinh}
     assert chon_ban_ghi_ca_nhan([], n) is None
     assert chon_ban_ghi_ca_nhan([dung, {"caNhanId": 6, "hoTen": "KHÁC", "namSinh": n.nam_sinh}], n) == dung
+    assert chon_ban_ghi_ca_nhan([dung, dict(dung, caNhanId=7)], n) == dung  # một người bị nhập trùng: lấy bản đầu
     with pytest.raises(RuntimeError):
-        chon_ban_ghi_ca_nhan([dung, dict(dung, caNhanId=7)], n)
+        chon_ban_ghi_ca_nhan([dict(dung, diaChi="A"), dict(dung, caNhanId=7, diaChi="B")], n)
 
 
 def test_chon_tai_khoan():

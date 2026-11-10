@@ -553,3 +553,15 @@ def test_nap_file_trung_to_thua_thi_bao_va_loai_dong_trung(cua_so, mau, tmp_path
     assert [h.dau.excel_row for h in lo.ho_so] == [6, 7]
     assert len(bao) == 1 and "dòng 8" in bao[0][1] and "dòng 7" in bao[0][1]
     assert not [v for v in lo.van_de if v.ma == "BR-03" and v.muc == "loi"]
+
+
+def test_tai_file_mau(cua_so, tmp_path, monkeypatch):
+    from tiep_nhan.domain.rules import kiem_tra_file
+    from tiep_nhan.infra.excel_in import read_phieu
+    ra = tmp_path / "phieu_chuyen_mau.xlsx"
+    monkeypatch.setattr(S.QFileDialog, "getSaveFileName", lambda *a, **k: (str(ra), ""))
+    monkeypatch.setattr(S, "hop_thong_bao", lambda *a, **k: None)
+    cua_so.man[S.LO_MOI].nut_mau.click()
+    rows, van_de = kiem_tra_file(read_phieu(ra))
+    assert len(rows) == 2 and not [v for v in van_de if v.muc == "loi"]
+    assert all(r.thua.so_to == 999 for r in rows)  # tờ giả: không thể tạo hồ sơ thật từ file mẫu

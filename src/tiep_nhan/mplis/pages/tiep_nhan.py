@@ -21,9 +21,12 @@ def khop_can_bo(o: list[str], ten: str) -> bool:
 
 
 def chon_ca_nhan(dong: list[list[str]], n: Nguoi) -> int | None:
-    """Vị trí bản ghi duy nhất khớp họ tên và năm sinh (cột 3 và 5). Không duy nhất thì None."""
+    """Vị trí bản ghi khớp họ tên và năm sinh (cột 3 và 5). Nhiều bản ghi khớp mà giống hệt nhau trừ mã (một người bị nhập
+    trùng trong danh bạ MPLIS) thì lấy bản đầu như người dùng; khác nhau thì None."""
     khop = [i for i, c in enumerate(dong) if _chuan(c[2]) == _chuan(n.ho_ten) and c[4].strip().endswith(str(n.nam_sinh))]
-    return khop[0] if len(khop) == 1 else None
+    if len({tuple(_chuan(x) for x in dong[i][2:]) for i in khop}) == 1:
+        return khop[0]
+    return None
 
 
 def khop_dien_tich(tren_mplis: str, excel: float) -> bool:

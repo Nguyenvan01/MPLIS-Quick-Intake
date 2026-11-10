@@ -9,6 +9,7 @@ installer/Output/
 *.xlsx
 *.xlsm
 !tests/data/*_an_danh.xlsx
+!assets/mau/phieu_chuyen_mau.xlsx
 # Trace/ảnh Playwright có thể chứa dữ liệu thật
 *.zip
 *.png
