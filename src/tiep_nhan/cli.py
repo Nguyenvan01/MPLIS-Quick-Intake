@@ -15,6 +15,7 @@ from pathlib import Path
 from .domain.danh_muc import DanhMuc
 from .domain.gom_ho_so import CheDoGom
 from .infra.config import Settings, config_file
+from .infra.logging import che_so_trong_chu
 
 
 def _lo(args):
@@ -30,7 +31,7 @@ def cmd_kiem_tra(args) -> int:
         print(f"  - {hs.key}: {hs.mo_ta}")
     for v in lo.van_de:
         where = f"dòng {v.excel_row}" if v.excel_row else "file"
-        print(f"[{'LỖI' if v.muc == 'loi' else 'cảnh báo'}] {v.ma} {where}: {v.noi_dung}")
+        print(f"[{'LỖI' if v.muc == 'loi' else 'cảnh báo'}] {v.ma} {where}: {che_so_trong_chu(v.noi_dung)}")
     return 1 if lo.co_loi else 0
 
 

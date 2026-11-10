@@ -17,6 +17,7 @@ from ..mplis.port import MplisPort
 class Worker(QThread):
     event = Signal(str, str, str, str)  # key, trạng thái, ghi chú, mã hồ sơ
     hoi_so = Signal(str, str)           # mô tả thửa, số phát hành bị trùng
+    danh_ba = Signal(dict)              # tài khoản -> họ tên người xử lý lấy từ MPLIS
 
     def __init__(self, ho_so: list[HoSo], store: StateStore, tao_port: Callable[[], ContextManager[MplisPort]],
                  opts: RunOptions):
@@ -40,11 +41,22 @@ class Worker(QThread):
         self._co_tra_loi.wait()
         return self._so_moi or None
 
+    def _lay_danh_ba(self, m: MplisPort) -> None:
+        """Làm mới danh sách người xử lý cho ô chọn ở màn Lô mới; lỗi thì bỏ qua, không ảnh hưởng lượt chạy."""
+        try:
+            ds = m.ds_nguoi_xu_ly()
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Không lấy được danh sách người xử lý: {type(e).__name__}: {str(e)[:150]}")
+            return
+        if ds:
+            self.danh_ba.emit(ds)
+
     def run(self) -> None:
         try:
             with self.tao_port() as m:
                 m.hoi_so_moi = self._hoi_so
                 m.cho_dang_nhap()
+                self._lay_danh_ba(m)
                 Runner(self.ho_so, m, self.store, self.opts, on_event=self.event.emit,
                        should_stop=lambda: self._stop).run()
         except Exception as e:  # noqa: BLE001

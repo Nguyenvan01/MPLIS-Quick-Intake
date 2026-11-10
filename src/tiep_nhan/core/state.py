@@ -65,8 +65,19 @@ class StateStore:
 
     def ds_lo(self) -> list[dict]:
         with self._lock:
-            r = self._db.execute("SELECT thoi_gian, file, che_do, so_ho_so, tom_tat, keys FROM lo ORDER BY id DESC").fetchall()
-        return [dict(zip(("thoi_gian", "file", "che_do", "so_ho_so", "tom_tat"), x[:5]), keys=json.loads(x[5])) for x in r]
+            r = self._db.execute("SELECT id, thoi_gian, file, che_do, so_ho_so, tom_tat, keys FROM lo ORDER BY id DESC").fetchall()
+        return [dict(zip(("id", "thoi_gian", "file", "che_do", "so_ho_so", "tom_tat"), x[:6]), keys=json.loads(x[6])) for x in r]
+
+    def xoa_lo(self, id_: int) -> None:
+        """Chỉ xoá dòng lịch sử lô; trạng thái từng hồ sơ (bảng ho_so) giữ lại để không tạo trùng trên MPLIS."""
+        with self._lock:
+            self._db.execute("DELETE FROM lo WHERE id=?", (id_,))
+            self._db.commit()
+
+    def xoa_het_lo(self) -> None:
+        with self._lock:
+            self._db.execute("DELETE FROM lo")
+            self._db.commit()
 
     def get(self, key: str) -> BanGhi:
         with self._lock:

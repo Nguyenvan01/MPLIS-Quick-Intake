@@ -28,6 +28,13 @@ class FakeMplis:
     loi_hoan_tat: set[str] = field(default_factory=set)              # key hồ sơ lỗi khi Hoàn tất
     mo_lai: list[str] = field(default_factory=list)                  # các hồ sơ được mở lại khi chạy lại
     goi: list[str] = field(default_factory=list)                     # thứ tự các thao tác ghi
+    so_da_cap_san: set[str] = field(default_factory=set)             # số phát hành MPLIS coi là đã cấp
+    so_da_quet: list[str] = field(default_factory=list)              # các số đã gửi đi kiểm tra
+    so_dung: dict[str, str | None] = field(default_factory=dict)     # key hồ sơ -> số phát hành wizard dùng
+    loi_quet: bool = False                                           # giả lập không gọi được lệnh kiểm tra số
+    danh_ba: dict[str, str] = field(default_factory=dict)            # người xử lý MPLIS trả về
+    loi_thua: dict[str, str] = field(default_factory=dict)           # key hồ sơ -> vấn đề thửa MPLIS báo
+    loi_kiem_thua: bool = False                                      # giả lập không gọi được lệnh tìm thửa
     _form: HoSo | None = None
     _dem: int = 0
 
@@ -87,8 +94,23 @@ class FakeMplis:
             raise RuntimeError("lỗi giả lập khi chuyển xử lý")
         return self.tai_khoan_chuyen
 
+    def kiem_thua(self, hs: HoSo) -> str | None:
+        if self.loi_kiem_thua:
+            raise RuntimeError("lỗi giả lập khi tìm thửa")
+        return self.loi_thua.get(hs.key)
+
+    def ds_nguoi_xu_ly(self) -> dict[str, str]:
+        return dict(self.danh_ba)
+
+    def so_da_cap(self, ds: list[str]) -> set[str]:
+        if self.loi_quet:
+            raise RuntimeError("lỗi giả lập khi kiểm tra số phát hành")
+        self.so_da_quet += ds
+        return set(ds) & self.so_da_cap_san
+
     def dien_chuyen_quyen(self, hs: HoSo, ma_ho_so: str) -> None:
         self.goi.append("dien_chuyen_quyen")
+        self.so_dung[hs.key] = hs.dau.thua.ma_phat_hanh
         if hs.key in self.so_phat_hanh_trung:
             moi = self.hoi_so_moi("tờ/thửa", "AA 1") if self.hoi_so_moi else None
             if not moi:

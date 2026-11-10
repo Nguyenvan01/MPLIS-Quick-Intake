@@ -89,6 +89,11 @@ def nhieu_xa(dia_chi: str | None) -> bool:
     return bool(re.search(r"\+\s*(?:xã|phường|thị trấn)\s", dia_chi or "", re.IGNORECASE))
 
 
+def so_phat_hanh_hop_le(value: Any) -> bool:
+    """Số phát hành GCN mới: hai chữ cái và 8 chữ số, ví dụ 'AA 12345678' (người dùng chốt 10/11/2026)."""
+    return bool(re.fullmatch(r"[A-Z]{2} \d{8}", chuan_ma_phat_hanh(value) or ""))
+
+
 def chuan_ma_phat_hanh(value: Any) -> str | None:
     """'AA 11488897' -> 'AA 11488897' (chuẩn khoảng trắng, viết hoa)."""
     if value is None or value == "":

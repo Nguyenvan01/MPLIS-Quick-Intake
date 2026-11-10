@@ -1,4 +1,6 @@
 """Tìm trùng và đọc lại trên dữ liệu MPLIS trả về. Dữ liệu giả, cùng dạng phản hồi AdvancedSearchHoSoTiepNhan."""
+import pytest
+
 from tiep_nhan.domain.models import HoSo, Nguoi
 from tiep_nhan.domain.rules import kiem_tra_dong
 from tiep_nhan.infra.excel_in import RawRow
@@ -109,3 +111,55 @@ def test_dien_tich_mplis_dung_dau_cham_van_khop():
     assert khop_dien_tich("70", 70.0)
     assert khop_dien_tich("123,50", 123.5)
     assert not khop_dien_tich("107.5", 112.0)
+
+
+def _hs_khong_cccd():
+    dong, _ = kiem_tra_dong(RawRow(excel_row=6, values={
+        "stt": 1, "ma_dau_vao": "H31-1", "so_to": 3, "so_thua": 3549, "dien_tich": 56, "ong_ho_ten": "Người Chồng"}))
+    return HoSo(key="k", dong=(dong,))
+
+
+def test_khong_co_cccd_ma_thua_da_co_ho_so_thi_bao_loi_khong_coi_la_moi():
+    with pytest.raises(ValueError, match="CCCD"):
+        chon_trung([_ban_ghi("A", None)], _hs_khong_cccd())
+
+
+def test_khong_co_cccd_va_thua_chua_co_ho_so_thi_tao_moi_duoc():
+    assert chon_trung([_ban_ghi("A", None, thua=(("3576", "3", 64),))], _hs_khong_cccd()) is None
+
+
+def test_tham_so_tra_ho_so_dung_cac_truong_mplis_gui():
+    from tiep_nhan.mplis.pages.tra_cuu import tham_so_tra_ho_so
+    ts = dict(tham_so_tra_ho_so(12031, so_thua="3549", so_to="3", start=200, length=100))
+    assert ts["model[xaId]"] == "12031" and ts["model[tinhId]"] == "33"
+    assert ts["model[soThua]"] == "3549" and ts["model[soTo]"] == "3" and ts["model[soBienNhan]"] == ""
+    assert ts["start"] == "200" and ts["length"] == "100" and ts["model[daXuLy]"] == "-1" and ts["model[trangThaiKetISO][]"] == "0"
+
+
+def test_doc_het_moi_trang_ket_qua():
+    from tiep_nhan.mplis.pages.tra_cuu import doc_het_trang
+    goi = []
+
+    def mot_trang(start, length):
+        goi.append(start)
+        return {"recordsFiltered": 250, "data": [{"i": i} for i in range(start, min(start + length, 250))]}
+
+    kq = doc_het_trang(mot_trang, length=100)
+    assert len(kq) == 250 and goi == [0, 100, 200]
+
+
+def test_doc_het_trang_khi_khong_co_ket_qua():
+    from tiep_nhan.mplis.pages.tra_cuu import doc_het_trang
+    assert doc_het_trang(lambda s, n: {"recordsFiltered": 0, "data": []}) == []
+
+
+@pytest.mark.parametrize("ban_ghi, mong", [
+    ([{"soThuTuThua": 3549, "soHieuToBanDo": 3, "dienTich": 56.0}], None),
+    ([{"soThuTuThua": "3549", "soHieuToBanDo": "3", "dienTich": "56"}], None),
+    ([{"soThuTuThua": 3549, "soHieuToBanDo": 3, "dienTich": 107.5}], "Diện tích trên MPLIS (107,5) khác Excel (56)"),
+    ([{"soThuTuThua": 3576, "soHieuToBanDo": 3, "dienTich": 56.0}], "Không thấy thửa 3/3549 trên MPLIS"),
+    ([], "Không thấy thửa 3/3549 trên MPLIS"),
+])
+def test_doi_chieu_thua(ban_ghi, mong):
+    from tiep_nhan.mplis.pages.tra_cuu import doi_chieu_thua
+    assert doi_chieu_thua(ban_ghi, _hs()) == mong
