@@ -303,6 +303,10 @@ class ManLoMoi(ManHinh):
         self.che_do.addItem("Gộp các dòng cùng Mã đầu vào", CheDoGom.THEO_MA_DAU_VAO)
         self.can_bo = QComboBox()
         self.can_bo.setEditable(True)
+        self.quy_trinh = QComboBox()
+        self.quy_trinh.addItem("Chủ đầu tư nộp nhiều hồ sơ (từ 30 hồ sơ trở lên)", "2")
+        self.quy_trinh.addItem("Cấp đơn lẻ (dưới 30 hồ sơ)", "1")
+        self.quy_trinh.setCurrentIndex(max(self.quy_trinh.findData(p.settings.quy_trinh), 0))
         self.gan_day = QListWidget()
         self.gan_day.setObjectName("ganDay")
         self.gan_day.setSpacing(0)
@@ -321,7 +325,8 @@ class ManLoMoi(ManHinh):
         luoi.addLayout(_o_nhan("Sheet", self.sheet), 0, 0)
         luoi.addLayout(_o_nhan("Chế độ gộp", self.che_do), 0, 1)
         ghi_chu = _ghi_chu_the("thong_tin", '<b>Người nộp</b> lấy từ cột "Người nộp" trong Excel; ô trống thì tra theo người nhận.')
-        luoi.addLayout(_o_nhan("Người xử lý tác vụ tiếp theo", self.can_bo, ghi_chu), 1, 0, 1, 2)
+        luoi.addLayout(_o_nhan("Quy trình 1.012787", self.quy_trinh), 1, 0, 1, 2)
+        luoi.addLayout(_o_nhan("Người xử lý tác vụ tiếp theo", self.can_bo, ghi_chu), 2, 0, 1, 2)
         the_lap = The(_tieu_de_the("Thiết lập lô"), luoi)
         the_lap.layout().addStretch(1)
         xem_het = NutChu("Xem tất cả")
@@ -539,7 +544,8 @@ class ManLoMoi(ManHinh):
         p.can_bo = self.can_bo.currentText().split(TACH_TEN)[0].strip()  # chỉ tài khoản; họ tên chỉ để dễ tìm
         if p.can_bo:
             p.settings.ds_can_bo = [p.can_bo] + [x for x in p.settings.ds_can_bo if x != p.can_bo]
-            p.settings.save()
+        p.settings.quy_trinh = self.quy_trinh.currentData()
+        p.settings.save()
         p.ket_qua, p.can_chay, p.da_reset, p.lan_chay = {}, None, False, None
         p.nap()
         self.di_toi(KIEM_TRA)
@@ -1269,7 +1275,8 @@ class ManChay(ManHinh):
         self._khoa_che_do(False)
         kq = {hs.key: p.ket_qua[hs.key] for hs in self.ho_so_chay if hs.key in p.ket_qua}
         tom_tat = " · ".join(f"{n} {st}" for st, n in Counter(v[0] for v in kq.values()).most_common())
-        p.store.ghi_lo(str(p.file), self.che_do, len(self.ho_so_chay), tom_tat, [hs.key for hs in self.ho_so_chay])
+        p.store.ghi_lo(str(p.file), self.che_do, len(self.ho_so_chay), tom_tat, [hs.key for hs in self.ho_so_chay],
+                       che_do_gom=p.che_do.value, sheet=p.sheet or "")
         p.lan_chay = {"che_do": self.che_do, "file": p.file.name if p.file else "", "thoi_gian": datetime.now().isoformat(timespec="seconds"), "giay": giay}
         p.can_chay, p.da_reset = None, False
         if not self.window().isActiveWindow():
@@ -1738,7 +1745,9 @@ class ManLichSu(ManHinh):
         if not f.exists():
             hop_thong_bao(self, "Không thấy file", str(f), "canh_bao")
             return
-        p.file, p.sheet = f, None
+        p.file, p.sheet = f, x.get("sheet") or None
+        if x.get("che_do_gom"):  # lô cũ chưa lưu chế độ gộp thì giữ chế độ đang chọn
+            p.che_do = CheDoGom(x["che_do_gom"])
         p.nap()
         p.ket_qua = {}
         for k in x["keys"]:

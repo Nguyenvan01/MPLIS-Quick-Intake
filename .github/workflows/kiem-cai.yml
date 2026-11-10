@@ -1,0 +1,58 @@
+name: Kiểm tra bản cài trên Windows sạch
+
+# Máy Windows mới cho mỗi lần chạy: build bản cài, cài im lặng cho riêng người dùng (không admin),
+# mở app ở chế độ tự kiểm (cửa sổ, font, Chromium đi kèm), gỡ cài đặt, kiểm tra dữ liệu người dùng còn giữ.
+on:
+  push:
+    branches: ["kiem-cai-*"]
+  workflow_dispatch:
+
+jobs:
+  cai-thu:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Cài Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build bản cài
+        shell: pwsh
+        run: ./build.ps1 -Version 0.0.0-kiem
+
+      - name: Cài im lặng cho riêng người dùng
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem installer\Output\*.exe).FullName
+          Start-Process -Wait $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/CURRENTUSER','/NORESTART'
+          $exe = "$env:LOCALAPPDATA\Programs\NhapPhieuMPLIS\NhapPhieuMPLIS.exe"
+          if (-not (Test-Path $exe)) { Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Depth 1 | Select-Object FullName; throw "Không thấy NhapPhieuMPLIS.exe sau khi cài cho riêng người dùng" }
+          "EXE=$exe" | Out-File -Append $env:GITHUB_ENV
+
+      - name: Mở app ở chế độ tự kiểm
+        shell: pwsh
+        run: |
+          $ra = "$env:RUNNER_TEMP\kiem_cai.json"
+          $env:NHAP_PHIEU_KIEM_CAI = $ra
+          $p = Start-Process $env:EXE -PassThru
+          if (-not $p.WaitForExit(240000)) { $p.Kill(); throw "App không tự thoát sau 4 phút" }
+          if (-not (Test-Path $ra)) { throw "App không ghi kết quả tự kiểm" }
+          Get-Content $ra
+          $kq = Get-Content $ra -Raw | ConvertFrom-Json
+          if ($kq.chromium -ne "ok") { throw "Chromium đi kèm không chạy: $($kq.chromium)" }
+          if ($kq.font -ne "Be Vietnam Pro") { throw "Font không nạp được: $($kq.font)" }
+          if (-not (Test-Path "$env:APPDATA\NhapPhieuMPLIS")) { throw "App không tạo thư mục dữ liệu" }
+
+      - name: Gỡ cài đặt, dữ liệu người dùng phải còn
+        shell: pwsh
+        run: |
+          $go = (Get-ChildItem "$env:LOCALAPPDATA\Programs\NhapPhieuMPLIS\unins*.exe").FullName
+          Start-Process -Wait $go -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART'
+          if (Test-Path $env:EXE) { throw "Gỡ cài đặt xong vẫn còn NhapPhieuMPLIS.exe" }
+          if (-not (Test-Path "$env:APPDATA\NhapPhieuMPLIS")) { throw "Gỡ cài đặt làm mất %APPDATA%\NhapPhieuMPLIS" }
+          "Gỡ cài đặt xong, dữ liệu người dùng vẫn còn."

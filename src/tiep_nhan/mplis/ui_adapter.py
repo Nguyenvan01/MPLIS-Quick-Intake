@@ -46,7 +46,9 @@ JS_KIEM_SO = """async ([url, ds]) => {
 # Danh sách người nhận bước Thụ lý mà hộp "Chọn người xử lý" của MPLIS tải (lấy từ trace). forceReload=true vì có lúc
 # trả thiếu (33 thay vì 125 tài khoản). Quy trình QD_1_012787_2 là quy trình mặc định đã chốt trong plan.md.
 API_NGUOI_XU_LY = "/dc/DangKyAjax/GetUserInOuHasPermissionOnActivity"
-THAN_NGUOI_XU_LY = {"schemaCode": "QD_1_012787_2", "state": "ThuLyHoSo", "tinhId": 33, "xaId": 12031, "forceReload": True}
+def than_nguoi_xu_ly(quy_trinh: str) -> dict:
+    """Quy trình _1 và _2 có người nhận bước Thụ lý khác nhau (vd. ltmung.nnmt không nhận được ở _1)."""
+    return {"schemaCode": f"QD_1_012787_{quy_trinh}", "state": "ThuLyHoSo", "tinhId": 33, "xaId": 12031, "forceReload": True}
 
 
 JS_GOI_FORM = """async ([url, ts]) => {
@@ -148,12 +150,13 @@ class PlaywrightMplis:
     def ds_nguoi_xu_ly(self) -> dict[str, str]:
         if not da_dang_nhap(self.page.url, self.settings.mplis_url):
             self.cho_dang_nhap()
-        kq = self.page.evaluate(JS_KIEM_SO, [urljoin(self.settings.mplis_url, API_NGUOI_XU_LY), [THAN_NGUOI_XU_LY]])[0]
+        kq = self.page.evaluate(JS_KIEM_SO, [urljoin(self.settings.mplis_url, API_NGUOI_XU_LY), [than_nguoi_xu_ly(self.settings.quy_trinh)]])[0]
         if not kq.get("success"):
             raise RuntimeError(f"MPLIS không trả danh sách người xử lý: {kq}")
         return {x["UserName"]: (x.get("FullName") or "").strip() for x in kq.get("value") or [] if x.get("UserName")}
 
     def mo_form(self) -> None:
+        self.form.quy_trinh = self.settings.quy_trinh
         self.form.mo()
 
     def dien(self, hs: HoSo) -> None:

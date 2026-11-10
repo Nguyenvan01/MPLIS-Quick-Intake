@@ -163,3 +163,20 @@ def test_doc_het_trang_khi_khong_co_ket_qua():
 def test_doi_chieu_thua(ban_ghi, mong):
     from tiep_nhan.mplis.pages.tra_cuu import doi_chieu_thua
     assert doi_chieu_thua(ban_ghi, _hs()) == mong
+
+
+def test_chu_khop_quy_trinh_theo_lua_chon():
+    import tomllib
+    from tiep_nhan.mplis.pages.tiep_nhan import chu_khop_quy_trinh
+    from tiep_nhan.infra.config import resource_dir
+    cfg = tomllib.loads((resource_dir() / "locators.toml").read_text(encoding="utf-8"))["tiep_nhan"]
+    assert chu_khop_quy_trinh(cfg, "1") == "dưới 30 hồ sơ"
+    assert chu_khop_quy_trinh(cfg, "2") == "(từ 30 hồ"
+    with pytest.raises(ValueError):
+        chu_khop_quy_trinh(cfg, "3")
+
+
+def test_danh_sach_nguoi_xu_ly_theo_quy_trinh_dang_chon():
+    from tiep_nhan.mplis.ui_adapter import than_nguoi_xu_ly
+    assert than_nguoi_xu_ly("1")["schemaCode"] == "QD_1_012787_1"
+    assert than_nguoi_xu_ly("2")["schemaCode"] == "QD_1_012787_2" and than_nguoi_xu_ly("2")["forceReload"] is True

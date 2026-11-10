@@ -34,8 +34,9 @@ NEN_PHAN_DOAN = "#E4EBF7"                                                       
 KE_BANG, NEN_DANG_CHAY = NEN_CHON, "#EDECED"
 VIEN_KEO, NEN_KEO = VIEN_DAM, NEN_THE                                           # khung kéo thả file
 CHU_MO = "#8A8A8A"                                                              # icon trang trí ở trạng thái trống
-FONT_TIEU_DE = ["Segoe UI", ".AppleSystemUIFont", "Helvetica Neue", "Arial"]  # ponytail: Host Grotesk thiếu chữ Việt, chờ người dùng chọn font
-FONT_NOI_DUNG = ["Segoe UI", ".AppleSystemUIFont", "Helvetica Neue", "Arial"]  # ponytail: Instrument Sans thiếu chữ Việt, như trên
+# Be Vietnam Pro (assets/fonts, giấy phép OFL): đủ chữ Việt. Host Grotesk, Instrument Sans trong prompt thiếu dấu tiếng Việt nên không dùng.
+FONT_TIEU_DE = ["Be Vietnam Pro", "Segoe UI", ".AppleSystemUIFont", "Arial"]
+FONT_NOI_DUNG = ["Be Vietnam Pro", "Segoe UI", ".AppleSystemUIFont", "Arial"]
 CO_TIEU_DE_MAN, CO_TIEU_DE_THE, CO_CHU, CO_NHAN, CO_NHO = 30, 18, 14, 13, 12   # đúng 5 cỡ chữ
 
 # trạng thái -> (chữ, nền, chấm); chữ trên nền đạt WCAG AA >= 4.5:1 (đo trong tests/test_giao_dien.py)

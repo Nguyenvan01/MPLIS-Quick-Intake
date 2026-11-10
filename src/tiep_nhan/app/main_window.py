@@ -1,17 +1,20 @@
 """Cửa sổ chính: thanh điều hướng, dải chế độ và các màn hình trong app/screens.py."""
 from __future__ import annotations
 
+import json
+import os
 import sys
+from pathlib import Path
 
-from PySide6.QtCore import QEasingCurve, QPointF, QRect, QRectF, QSize, Qt, QVariantAnimation
-from PySide6.QtGui import QCloseEvent, QColor, QFont, QKeySequence, QPainter, QPen, QPixmap, QShortcut
+from PySide6.QtCore import QEasingCurve, QPointF, QRect, QRectF, QSize, Qt, QTimer, QVariantAnimation
+from PySide6.QtGui import QCloseEvent, QColor, QFont, QFontInfo, QKeySequence, QPainter, QPen, QPixmap, QShortcut
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMainWindow, QStackedWidget, QStyle,
                                QStyledItemDelegate, QVBoxLayout, QWidget)
 
 from .. import __version__
 from . import screens as S
 from .giao_dien import (NEN_CHON, NEN_RE, TRANG, CHE_DO, CHU, CHU_NHAN, CHU_PHU, NHAN, TRANG_THAI, VIEN, VIEN_O, VONG_FOCUS, DaiCheDo, The, _font, _font_tieu_de,
-                        ap_giao_dien, chuyen_canh, co_hieu_ung, hop_thong_bao, ve_anh)
+                        ap_giao_dien, chuyen_canh, co_hieu_ung, hop_thong_bao, nap_font, ve_anh)
 from .screens import MAN_HINH, Phien, phien_mac_dinh
 
 SO_BUOC = 5
@@ -273,9 +276,37 @@ class MainWindow(QMainWindow):
             e.accept()
 
 
+def _mo_chromium_an() -> str:
+    """Mở Chromium đi kèm bản cài ở chế độ ẩn rồi đóng: xác nhận không phải cài thêm trình duyệt."""
+    if getattr(sys, "frozen", False):
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as pw:
+        b = pw.chromium.launch(headless=True)
+        trang = b.new_page()
+        trang.set_content("<p>ok</p>")
+        chu = trang.inner_text("p")
+        b.close()
+    return chu
+
+
+def tu_kiem(w: MainWindow, ra: Path) -> bool:
+    """Chế độ tự kiểm sau khi cài (biến môi trường NHAP_PHIEU_KIEM_CAI): ghi kết quả ra file để máy kiểm tra đọc."""
+    try:
+        chromium = _mo_chromium_an()
+    except Exception as e:  # noqa: BLE001 — ghi lỗi ra file thay vì làm app sập
+        chromium = f"{type(e).__name__}: {e}"[:300]
+    nap_font()
+    kq = {"phien_ban": __version__, "cua_so": w.isVisible(), "font": QFontInfo(_font(14)).family(), "chromium": chromium}
+    ra.write_text(json.dumps(kq, ensure_ascii=False), encoding="utf-8")
+    return chromium == "ok"
+
+
 def main() -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     ap_giao_dien(app)
     w = MainWindow()
     w.show()
+    if duong := os.environ.get("NHAP_PHIEU_KIEM_CAI"):
+        QTimer.singleShot(1500, lambda: app.exit(0 if tu_kiem(w, Path(duong)) else 1))
     return app.exec()

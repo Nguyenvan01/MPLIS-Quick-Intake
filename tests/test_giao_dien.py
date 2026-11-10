@@ -267,5 +267,16 @@ def test_tuong_phan_chu_tren_nen_dat_wcag_aa(ten, chu, nen):
     assert tuong_phan(chu, nen) >= 4.5, f"{ten}: {tuong_phan(chu, nen):.2f}"
 
 
-def test_nap_duoc_font_trong_assets(qtbot):
-    assert {"Host Grotesk", "Instrument Sans"} <= set(G.nap_font())
+def test_font_be_vietnam_pro_du_chu_viet_va_duoc_dung_cho_tieu_de_lan_noi_dung(qtbot):
+    from pathlib import Path
+    from PySide6.QtGui import QFontInfo, QRawFont
+    from tiep_nhan.infra.config import assets_dir
+    assert "Be Vietnam Pro" in G.nap_font()
+    tep = sorted((assets_dir() / "fonts").glob("BeVietnamPro-*.ttf"))
+    assert [t.stem.split("-")[1] for t in tep] == ["Bold", "Medium", "Regular", "SemiBold"]
+    chu_viet = list(range(0x1EA0, 0x1EFA)) + [ord(c) for c in "ĐđƯưƠơĂăÂâÊêÔô"]
+    for t in tep:
+        raw = QRawFont(str(t.resolve()), 14)
+        assert all(raw.supportsCharacter(c) for c in chu_viet), t.name
+    assert QFontInfo(G._font(14)).family() == "Be Vietnam Pro"
+    assert QFontInfo(G._font_tieu_de(30)).family() == "Be Vietnam Pro"

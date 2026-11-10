@@ -384,3 +384,22 @@ def test_chay_thu_khong_quet_thua(ho_so, store):
     port = FakeMplis(loi_thua={ho_so[0].key: "Không thấy thửa"})
     run(ho_so, port, store, dry=True)
     assert store.get(ho_so[0].key).trang_thai is TrangThai.CHO
+
+
+def test_lich_su_luu_che_do_gom_va_sheet(store):
+    store.ghi_lo("a.xlsx", "Chạy thử", 1, "1 Chạy thử", ["k1"], che_do_gom="theo_ma_dau_vao", sheet="Phieu chuyen")
+    x = store.ds_lo()[0]
+    assert x["che_do_gom"] == "theo_ma_dau_vao" and x["sheet"] == "Phieu chuyen"
+
+
+def test_file_trang_thai_cu_chua_co_cot_che_do_gom_van_doc_duoc(tmp_path):
+    import sqlite3
+    db = tmp_path / "cu.sqlite3"
+    c = sqlite3.connect(db)
+    c.execute("CREATE TABLE lo (id INTEGER PRIMARY KEY AUTOINCREMENT, thoi_gian TEXT NOT NULL, file TEXT NOT NULL, che_do TEXT NOT NULL,"
+              " so_ho_so INTEGER NOT NULL, tom_tat TEXT NOT NULL, keys TEXT NOT NULL)")
+    c.execute("INSERT INTO lo(thoi_gian, file, che_do, so_ho_so, tom_tat, keys) VALUES ('2026-11-01T08:00:00','b.xlsx','Chạy thật',2,'2 Thành công','[]')")
+    c.commit()
+    c.close()
+    x = StateStore(db).ds_lo()[0]
+    assert x["file"] == "b.xlsx" and x["che_do_gom"] == "" and x["sheet"] == ""
