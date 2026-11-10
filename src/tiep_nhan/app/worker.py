@@ -55,6 +55,7 @@ class Worker(QThread):
         try:
             with self.tao_port() as m:
                 m.hoi_so_moi = self._hoi_so
+                m.ghi_api = not self.opts.dry_run  # chạy thử luôn điền trên giao diện để chụp ảnh
                 m.cho_dang_nhap()
                 self._lay_danh_ba(m)
                 Runner(self.ho_so, m, self.store, self.opts, on_event=self.event.emit,

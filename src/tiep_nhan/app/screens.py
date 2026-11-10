@@ -531,6 +531,11 @@ class ManLoMoi(ManHinh):
         self.phu_file.setToolTip("")
         self.tiep.setEnabled(True)
         self.tiep.setToolTip("")
+        trung = [v for v in self.p.lo.van_de if v.ma == "BR-03" and v.muc == "canh_bao"]
+        if trung:  # tờ + thửa là duy nhất: báo ngay những dòng đã bị loại khỏi lô
+            hop_thong_bao(self, f"Đã loại {len(trung)} dòng trùng tờ/thửa",
+                          "\n".join(f"dòng {v.excel_row}: {v.noi_dung}" for v in trung)
+                          + "\n\nCác dòng này không được nhập. Kiểm tra lại file Excel nếu cần.", "canh_bao")
 
     def _phim_tiep(self) -> None:
         if self.tiep.isEnabled():

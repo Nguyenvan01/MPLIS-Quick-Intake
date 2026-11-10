@@ -61,9 +61,82 @@ class ChuyenQuyenPage(TiepNhanPage):
         expect(self._wiz()).to_be_visible()
         self._cho()
 
+    def mo_du_thao(self) -> None:
+        """Bước 16: Quy trình xử lý → Dự thảo giấy chứng nhận → chọn GCN → mở màn dự thảo. Không bấm Lưu dự thảo."""
+        q = self._el("modal_quy_trinh")
+        if not q.is_visible():  # sau Hoàn tất MPLIS để nguyên hộp Quy trình; chạy lại hoặc đã rời trang thì mở lại
+            self._ve_ho_so()
+            self._el("nut_xu_ly").click()
+            expect(q).to_be_visible()
+        self._cho()
+        tac_vu = self._el("dong_tac_vu", q).filter(has_text="Dự thảo giấy chứng nhận")
+        expect(tac_vu).to_have_count(1)
+        self._el("lk_xu_ly", tac_vu).click()
+        dong = self._el("dong_gcn_du_thao", self._wiz())
+        expect(dong).to_have_count(1, timeout=60_000)  # hồ sơ chuyển quyền trọn giấy chỉ có một GCN mới
+        dong.click()
+        self._hien("nut_du_thao", self._wiz()).click()
+        expect(self._hien("modal_du_thao")).to_be_visible(timeout=60_000)
+        self._cho()
+
+    def _cho_lenh(self, ten: str, bam, timeout: int = 60_000) -> None:
+        """Bấm rồi chờ lệnh `ten` gửi lên MPLIS trả success; MPLIS từ chối thì báo lý do."""
+        with self.page.expect_response(lambda r: ten in r.url, timeout=timeout) as tl:
+            bam()
+        kq = tl.value.json()
+        if not (isinstance(kq, dict) and kq.get("success")):
+            ly_do = kq.get("Error") or kq.get("message") if isinstance(kq, dict) else ""
+            raise RuntimeError(f"MPLIS không thực hiện {ten}: {' '.join(re.sub(r'<[^>]+>', ' ', str(ly_do or '')).split())}")
+
+    def luu_du_thao(self) -> None:
+        """Làm theo mẫu người dùng 10/11/2026: chọn khung QR → biểu tượng QR → Tạo QR mới → Lưu dự thảo → Đồng ý. Không in.
+        GCN đã có QR thì bấm Không (tạo mới làm QR đã cấp hết tra cứu được), giữ QR cũ rồi Lưu dự thảo."""
+        f = self._el("khung_du_thao").content_frame
+        expect(self._el("nut_luu_du_thao", f)).to_be_visible(timeout=60_000)
+        self._el("o_qr", f).click()
+        self._el("nut_mo_qr", f).click()
+        tao: list = []
+        nghe = lambda r: "CreateNoiDungQR" in r.url and tao.append(r)  # noqa: E731
+        self.page.on("response", nghe)
+        try:
+            self._hien("nut_tao_qr", f).click()
+            da_co = self._hien("hop", f).filter(has_text=self.L.data[self.P]["qr_da_co"])
+            try:
+                expect(da_co).to_be_visible(timeout=3_000)  # MPLIS hỏi ngay, không gọi máy chủ
+            except AssertionError:
+                r = tao[0] if tao else self.page.wait_for_event("response", lambda r: "CreateNoiDungQR" in r.url, timeout=60_000)
+                if not r.json().get("success"):
+                    raise RuntimeError(f"MPLIS không tạo được QR: {r.json().get('Error') or ''}") from None
+            else:
+                # tạo mới sẽ làm QR đã cấp không tra cứu được nữa: giữ QR cũ
+                self._hien("hop_khong", da_co).click()
+                self._hien("nut_dong_qr", f).click()
+        finally:
+            self.page.remove_listener("response", nghe)
+        self._el("nut_luu_du_thao", f).click()
+        # lượt thật 10/11/2026: MPLIS trả lời Lưu dự thảo sau hơn 60 giây (thân lệnh chứa cả bản PDF)
+        self._cho_lenh("SaveDuThaoGiayChungNhan", lambda: self._hien("hop_dong_y", self._hien("hop", f)).click(), timeout=180_000)
+
     def _sau(self, den_buoc: int) -> None:
-        self._el("nut_buoc_sau", self._wiz()).click()
-        expect(self._el("buoc_hien", self._wiz()).filter(has_text=f"Bước {den_buoc}")).to_be_visible(timeout=90_000)
+        # MPLIS từ chối qua bước (vd "GCN chưa có pháp lý") chỉ hiện thông báo thoáng qua; đọc lý do từ phản hồi để báo người dùng
+        phan_hoi: list = []
+        nghe = lambda r: "ChuyenQuyenTronGiayBuoc" in r.url and phan_hoi.append(r)  # noqa: E731
+        self.page.on("response", nghe)
+        try:
+            self._el("nut_buoc_sau", self._wiz()).click()
+            expect(self._el("buoc_hien", self._wiz()).filter(has_text=f"Bước {den_buoc}")).to_be_visible(timeout=90_000)
+        except AssertionError:
+            for r in phan_hoi:
+                try:
+                    kq = r.json()
+                except Exception:  # noqa: BLE001
+                    continue
+                if isinstance(kq, dict) and kq.get("success") is False:
+                    ly_do = " ".join(re.sub(r"<[^>]+>", " ", str(kq.get("Error") or kq.get("message") or "")).split())
+                    raise RuntimeError(f"MPLIS không cho sang Bước {den_buoc}: {ly_do}") from None
+            raise
+        finally:
+            self.page.remove_listener("response", nghe)
         self._cho()
 
     def _dien_nguoi(self, n: Nguoi) -> None:

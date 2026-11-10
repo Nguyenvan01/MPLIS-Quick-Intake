@@ -143,3 +143,17 @@ o_vpdk         = { by = "css", value = "#rdVPCap" }
 o_so_vao_so    = { by = "css", value = "[name=soVaoSo]" }
 o_nguoi_ky     = { by = "css", value = "[name=tenNguoiKy]" }
 nut_luu_gcn    = { by = "css", value = "#btnLuuChiTietGiayChungNhan" }
+
+# Bước 16 "Dự thảo giấy chứng nhận" sau Hoàn tất, lấy từ bản ghi harvest 08/11/2026 và video v1.
+dong_gcn_du_thao = { by = "css", value = "#tblGiayChungNhan tbody tr:not(:has(td.dataTables_empty))" }
+nut_du_thao    = { by = "css", value = "a[id^=btnInGiayChungNhan-]" }
+modal_du_thao  = { by = "css", value = "div[id^=mdlDuThaoGiayChungNhan-]" }
+# Trong iframe màn dự thảo; lấy từ lượt người dùng làm mẫu 10/11/2026 (hồ sơ 9063).
+khung_du_thao  = { by = "css", value = "div[id^=mdlDuThaoGiayChungNhan-] iframe" }
+o_qr           = { by = "css", value = "div[style-binding='Page1.QRCode']" }   # bấm chọn khung QR thì biểu tượng tạo QR mới hiện
+nut_mo_qr      = { by = "css", value = "#btnCreateQRCode" }
+nut_tao_qr     = { by = "role", role = "button", name = "Tạo QR mới", exact = false }
+nut_luu_du_thao = { by = "css", value = "#btnSavePdf" }
+nut_dong_qr    = { by = "role", role = "button", name = "Đóng" }
+hop_khong      = { by = "role", role = "button", name = "Không", exact = false }
+qr_da_co       = "Mã QR của Giấy chứng nhận đã tồn tại"   # chữ trong CẢNH BÁO TẠO MỚI NỘI DUNG QR (10/11/2026)   # tên truy cập có ký tự biểu tượng phía trước nên không dùng role

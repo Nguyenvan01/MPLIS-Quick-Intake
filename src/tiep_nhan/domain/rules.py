@@ -25,7 +25,7 @@ def _nguoi(v: dict, prefix: str, vai_tro: str, notes: list[tuple[str, str]]) -> 
         if any(v.get(f"{prefix}_{k}") for k in ("nam_sinh", "cccd", "dia_chi")):
             raise ValueError(f"Cột {vai_tro} có CCCD/năm sinh/địa chỉ nhưng thiếu họ tên")
         return None
-    cccd, cccd_notes = to_cccd(v.get(f"{prefix}_cccd"))
+    cccd, cccd_notes = to_cccd(v.get(f"{prefix}_cccd"), v.get(f"{prefix}_nam_sinh"))
     notes += [("BR-02", f"{vai_tro}: {n}") for n in cccd_notes]
     n = Nguoi(vai_tro=vai_tro, ho_ten=v[f"{prefix}_ho_ten"], nam_sinh=v.get(f"{prefix}_nam_sinh"),
               cccd=cccd, dia_chi=v.get(f"{prefix}_dia_chi"))
@@ -82,9 +82,9 @@ def kiem_tra_file(result: ReadResult) -> tuple[list[DongPhieu], list[VanDe]]:
         if dong is None:
             continue
         k = (dong.thua.so_to, dong.thua.so_thua)
-        if k in seen:  # BR-03
-            issues.append(VanDe(excel_row=raw.excel_row, muc="loi", ma="BR-03",
-                                noi_dung=f"Trùng tờ/thửa {k[0]}/{k[1]} với dòng {seen[k]} — bỏ qua"))
+        if k in seen:  # BR-03: tờ + thửa là duy nhất; giữ dòng đầu, loại dòng sau, báo nhưng không chặn cả lô
+            issues.append(VanDe(excel_row=raw.excel_row, muc="canh_bao", ma="BR-03",
+                                noi_dung=f"Trùng tờ/thửa {k[0]}/{k[1]} với dòng {seen[k]} — đã loại khỏi lô"))
             continue
         ph = dong.thua.ma_phat_hanh
         if ph and ph in seen_ph:  # BR-03

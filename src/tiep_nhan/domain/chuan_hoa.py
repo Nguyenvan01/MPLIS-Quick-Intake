@@ -41,7 +41,7 @@ def to_int(value: Any) -> int | None:
     return int(m.group())
 
 
-def to_cccd(value: Any) -> tuple[str | None, list[str]]:
+def to_cccd(value: Any, nam_sinh: Any = None) -> tuple[str | None, list[str]]:
     """Trả về (số CCCD 12 chữ số, cảnh báo). Ô kiểu số làm mất số 0 đầu -> tự bù và cảnh báo."""
     notes: list[str] = []
     if value is None or value == "":
@@ -50,6 +50,10 @@ def to_cccd(value: Any) -> tuple[str | None, list[str]]:
         value = str(int(value)).zfill(12)
         notes.append("CCCD đang lưu dạng số trong Excel (dễ mất số 0 đầu) — đã tự bù cho đủ 12 số")
     s = re.sub(r"^cc:", "", re.sub(r"[\s.\-]", "", str(value)), flags=re.IGNORECASE)  # vài file ghi "CC: 0123…"
+    # ô Văn bản đã mất số 0 đầu từ trước: chỉ bù khi mã tỉnh hợp lệ và số 5–6 khớp năm sinh, không đoán khi thiếu năm sinh
+    if re.fullmatch(r"\d{11}", s) and nam_sinh and 1 <= int(s[:2]) <= 96 and s[3:5] == str(nam_sinh)[-2:]:
+        s = "0" + s
+        notes.append("CCCD chỉ có 11 số (mất số 0 đầu) — đã thêm số 0, khớp mã tỉnh và năm sinh")
     if not re.fullmatch(r"\d{12}", s):
         raise ValueError(f"CCCD '{value}' không đủ 12 chữ số")
     return s, notes
