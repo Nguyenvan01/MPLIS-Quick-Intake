@@ -429,3 +429,13 @@ def test_file_trang_thai_cu_chua_co_cot_che_do_gom_van_doc_duoc(tmp_path):
     c.close()
     x = StateStore(db).ds_lo()[0]
     assert x["file"] == "b.xlsx" and x["che_do_gom"] == "" and x["sheet"] == ""
+
+
+def test_log_loi_khong_ghi_ho_ten(ho_so, store):
+    dong = []
+    sink = logger.add(dong.append, format="{message}")
+    try:
+        run(ho_so[:1], FakeMplis(loi_chuyen_quyen={ho_so[0].key}), store)
+    finally:
+        logger.remove(sink)
+    assert dong and not any(n.ho_ten in m for m in dong for n in ho_so[0].dau.nguoi)

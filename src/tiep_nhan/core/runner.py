@@ -197,7 +197,7 @@ class Runner:
             msg = che_so_trong_chu(f"{type(e).__name__}: {str(e).splitlines()[0][:200] if str(e) else ''}")
             if not self.opts.dry_run and self.store.get(hs.key).trang_thai not in (TrangThai.DANG_TAO, TrangThai.CAN_KIEM_TRA, *MOC_SAU_LUU):
                 self.store.mark(hs.key, TrangThai.LOI, msg)
-            logger.exception(f"{hs.mo_ta}: lỗi (trace: {trace})")
+            logger.exception(f"{hs.key}: lỗi (trace: {trace})")  # không ghi họ tên ra log
             self.emit(hs.key, "Lỗi", f"{msg}" + (f" · trace: {trace}" if trace else ""), "")
             try:
                 self.port.ve_trang_dau()
