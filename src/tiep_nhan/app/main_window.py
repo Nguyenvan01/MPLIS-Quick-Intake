@@ -7,39 +7,19 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QEasingCurve, QPointF, QRect, QRectF, QSize, Qt, QTimer, QVariantAnimation
-from PySide6.QtGui import QCloseEvent, QColor, QFont, QFontInfo, QKeySequence, QPainter, QPen, QPixmap, QShortcut
+from PySide6.QtGui import QCloseEvent, QColor, QFont, QFontInfo, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMainWindow, QStackedWidget, QStyle,
                                QStyledItemDelegate, QVBoxLayout, QWidget)
 
 from .. import __version__
 from . import screens as S
 from .giao_dien import (NEN_CHON, NEN_RE, TRANG, CHE_DO, CHU, CHU_NHAN, CHU_PHU, NHAN, TRANG_THAI, VIEN, VIEN_O, VONG_FOCUS, DaiCheDo, The, _font, _font_tieu_de,
-                        ap_giao_dien, chuyen_canh, co_hieu_ung, hop_thong_bao, nap_font, ve_anh)
+                        ap_giao_dien, chuyen_canh, co_hieu_ung, hop_thong_bao, nap_font, ve_anh, ve_logo)
 from .screens import MAN_HINH, Phien, phien_mac_dinh
 
 SO_BUOC = 5
 TIEU_DE = f"Thêm mới nhanh hồ sơ tiếp nhận MPLIS — v{__version__}"
 DAU_CHAY_THAT = "● CHẠY THẬT – "
-
-
-def _logo() -> QPixmap:
-    ti_le = 2
-    pm = QPixmap(34 * ti_le, 34 * ti_le)
-    pm.setDevicePixelRatio(ti_le)
-    pm.fill(Qt.GlobalColor.transparent)
-    p = QPainter(pm)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor(NHAN))
-    p.drawRoundedRect(QRectF(0, 0, 34, 34), 10, 10)
-    p.setPen(QPen(QColor(TRANG), 2.4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-    for y, dai in ((11, 15), (17, 15), (23, 9)):
-        p.drawLine(QPointF(9, y), QPointF(9 + dai, y))
-    p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor(TRANG))
-    p.drawEllipse(QPointF(24, 23), 3, 3)
-    p.end()
-    return pm
 
 
 class _DelegateNav(QStyledItemDelegate):
@@ -174,7 +154,7 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(8, 20, 8, 2)
         lay.setSpacing(0)
         logo = QLabel()
-        logo.setPixmap(_logo())
+        logo.setPixmap(ve_logo(34))
         ten = QLabel("Tiếp nhận hồ sơ")
         ten.setFont(_font_tieu_de(14))
         cot = QVBoxLayout()

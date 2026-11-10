@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import re
+import struct
 import sys
 import unicodedata
+from pathlib import Path
 from collections.abc import Callable, Sequence
 from datetime import date, datetime
 
-from PySide6.QtCore import QByteArray, QEasingCurve, QElapsedTimer, QEvent, QObject, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer
+from PySide6.QtCore import QBuffer, QByteArray, QEasingCurve, QIODevice, QElapsedTimer, QEvent, QObject, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QFontMetrics, QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (QAbstractButton, QApplication, QDialog, QComboBox, QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout,
@@ -15,7 +17,7 @@ from PySide6.QtWidgets import (QAbstractButton, QApplication, QDialog, QComboBox
                                QVBoxLayout, QWidget)
 
 from ..infra.config import assets_dir, sub_dir
-from ..infra.logging import che_cccd, che_so_trong_chu
+from ..infra.logging import che_so_trong_chu
 from .icon_lucide import ICON
 
 # ===== Token của hệ thiết kế: mọi màn hình chỉ lấy màu, font từ đây =====
@@ -240,6 +242,56 @@ def nap_font() -> list[str]:
     return sorted(set(ho))
 
 
+CO_ICON = (16, 24, 32, 48, 64, 128, 256)
+
+
+def ve_logo(co: int, ti_le: int = 2) -> QPixmap:
+    """Logo của phần mềm: ô vuông bo góc màu nút chính, ba dòng phiếu và một chấm. Vẽ trên lưới 34 rồi co giãn."""
+    pm = QPixmap(co * ti_le, co * ti_le)
+    pm.setDevicePixelRatio(ti_le)
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    k = co / 34
+    p.scale(k, k)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QColor(NUT_CHINH))
+    p.drawRoundedRect(QRectF(0, 0, 34, 34), 10, 10)
+    p.setPen(QPen(QColor(TRANG), max(2.4, 1.6 / k), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))  # cỡ nhỏ: nét không dưới 1,6 px
+    for y, dai in ((11, 15), (17, 15), (23, 9)):
+        p.drawLine(QPointF(9, y), QPointF(9 + dai, y))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QColor(TRANG))
+    p.drawEllipse(QPointF(24, 23), 3, 3)
+    p.end()
+    return pm
+
+
+def bieu_tuong_app() -> QIcon:
+    ic = QIcon()
+    for co in CO_ICON:
+        ic.addPixmap(ve_logo(co, ti_le=1))
+    return ic
+
+
+def luu_ico(duong_dan: Path) -> None:
+    """Ghi file .ico nhiều cỡ (mỗi cỡ là một ảnh PNG, Windows Vista trở lên đọc được) cho exe và bộ cài."""
+    anh = []
+    for co in CO_ICON:
+        mang = QByteArray()
+        buf = QBuffer(mang)
+        buf.open(QIODevice.OpenModeFlag.WriteOnly)
+        ve_logo(co, ti_le=1).save(buf, "PNG")
+        anh.append((co, bytes(mang)))
+    dau = struct.pack("<HHH", 0, 1, len(anh))
+    vi_tri = 6 + 16 * len(anh)
+    muc = b""
+    for co, b in anh:
+        muc += struct.pack("<BBBBHHII", co % 256, co % 256, 0, 0, 1, 32, len(b), vi_tri)
+        vi_tri += len(b)
+    duong_dan.write_bytes(dau + muc + b"".join(b for _, b in anh))
+
+
 def ap_giao_dien(app: QApplication) -> None:
     nap_font()
     app.setStyle("Fusion")
@@ -256,6 +308,7 @@ def ap_giao_dien(app: QApplication) -> None:
     for ten, tron, bat in (("O_TICH_TAT", False, False), ("O_TICH_BAT", False, True), ("O_TRON_TAT", True, False), ("O_TRON_BAT", True, True)):
         qss = qss.replace(ten, _o_chon(tron, bat))
     app.setStyleSheet(qss)
+    app.setWindowIcon(bieu_tuong_app())
     app.chinh_combo = _ChinhCombo(app)  # giữ tham chiếu để bộ lọc không bị thu hồi
     app.installEventFilter(app.chinh_combo)
 

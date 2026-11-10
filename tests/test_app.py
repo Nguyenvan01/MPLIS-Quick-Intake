@@ -530,3 +530,10 @@ def test_tu_kiem_bao_loi_khi_chromium_khong_chay(cua_so, tmp_path, monkeypatch):
     ra = tmp_path / "kiem_cai.json"
     assert M.tu_kiem(cua_so, ra) is False
     assert "không tìm thấy Chromium" in json.loads(ra.read_text(encoding="utf-8"))["chromium"]
+
+
+def test_cai_dat_tuy_chon_chay_tren_giao_dien(cua_so):
+    m = cua_so.man[S.CAI_DAT]
+    assert not m.tich["chay_giao_dien"].isChecked()  # mặc định dùng API để tra cứu
+    m.tich["chay_giao_dien"].setChecked(True)
+    assert Settings.load().chay_giao_dien is True

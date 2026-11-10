@@ -1783,7 +1783,7 @@ class ManCaiDat(ManHinh):
             self.quy_doi[ten] = _chu_phu()
         self.tich: dict[str, QCheckBox] = {}
         for ten, nhan in (("cho_chay_khi_canh_bao", "Cho chạy khi còn cảnh báo"), ("tim_trung_truoc", "Tra trùng trước khi tạo"),
-                          ("headless", "Chạy Chromium ẩn")):
+                          ("chay_giao_dien", "Chạy hoàn toàn trên giao diện"), ("headless", "Chạy Chromium ẩn")):
             o = QCheckBox(nhan)
             o.setStyleSheet("QCheckBox { font-weight: 600; }")
             o.setChecked(getattr(s, ten))
@@ -1803,7 +1803,9 @@ class ManCaiDat(ManHinh):
         the_mac_dinh = The(_tieu_de_the("Giá trị mặc định của hồ sơ"), _o_nhan("Người ký", self.chu["nguoi_ky"]),
                            _o_nhan("Thời hạn mặc định", self.chu["thoi_han_mac_dinh"]))
         giai_thich = {"cho_chay_khi_canh_bao": "Lỗi chặn vẫn luôn chặn, dù bật hay tắt.", "tim_trung_truoc": "Thửa đã có hồ sơ trên MPLIS sẽ ghi là Đã có sẵn.",
-                      "headless": "Không thấy form đang điền; hộp hỏi số phát hành vẫn hiện."}
+                      "headless": "Không thấy form đang điền; hộp hỏi số phát hành vẫn hiện.",
+                      "chay_giao_dien": "Tắt: tra cứu và quét trước bằng API, nhanh hơn. Bật: không gọi API, bỏ qua bước quét trước. "
+                                        "Tạo hồ sơ luôn chạy trên giao diện."}
 
         def tich_co_mo_ta(ten: str) -> QVBoxLayout:
             lay = QVBoxLayout()
@@ -1814,7 +1816,8 @@ class ManCaiDat(ManHinh):
             lay.addWidget(phu)
             return lay
 
-        the_quy_tac = The(_tieu_de_the("Quy tắc khi chạy"), tich_co_mo_ta("cho_chay_khi_canh_bao"), tich_co_mo_ta("tim_trung_truoc"))
+        the_quy_tac = The(_tieu_de_the("Quy tắc khi chạy"), tich_co_mo_ta("cho_chay_khi_canh_bao"), tich_co_mo_ta("tim_trung_truoc"),
+                          tich_co_mo_ta("chay_giao_dien"))
         luoi_so = QHBoxLayout()
         luoi_so.setSpacing(16)
         for ten, nhan in (("timeout_ms", "Thời gian chờ"), ("slow_mo_ms", "Làm chậm")):
