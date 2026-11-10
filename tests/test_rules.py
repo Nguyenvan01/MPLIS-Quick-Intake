@@ -205,3 +205,9 @@ def test_dia_chi_thua_lam_sach_va_tach_xa():
 def test_so_tang_doc_tu_chu():
     from tiep_nhan.domain.models import NhaO
     assert NhaO(so_tang="5 tầng").so_tang == 5 and NhaO(so_tang=5).so_tang == 5
+
+
+@pytest.mark.parametrize("raw,loai", [("CC:001063000001", "Căn cước"), ("cc: 001063000001", "Căn cước"), ("001063000001", "CCCD")])
+def test_tien_to_cc_la_can_cuoc(raw, loai):
+    dong, _ = _dong(ong_ho_ten="Người Nhận", ong_cccd=raw)
+    assert dong.nguoi[0].cccd == "001063000001" and dong.nguoi[0].loai_giay_to == loai

@@ -18,6 +18,7 @@ class Nguoi(_Base):
     ho_ten: str = Field(min_length=2)
     nam_sinh: int | None = Field(default=None, ge=1900)
     cccd: str | None = Field(default=None, pattern=r"^\d{12}$")
+    loai_giay_to: Literal["CCCD", "Căn cước"] = "CCCD"  # Excel ghi "CC:0123…" là thẻ Căn cước (cấp từ 01/07/2024)
     dia_chi: str | None = None
 
     @field_validator("nam_sinh", mode="before")

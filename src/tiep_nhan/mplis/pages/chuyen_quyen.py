@@ -146,6 +146,8 @@ class ChuyenQuyenPage(TiepNhanPage):
         ten = self._o("o_ho_ten", f)
         ten.fill(n.ho_ten)
         self._dat(self._o("o_nam_sinh", f), str(n.nam_sinh or ""))  # fill() chỉ giữ chữ số cuối
+        if n.loai_giay_to == "Căn cước":
+            self._chon_loai_giay_to(f, self.L.data[self.P]["loai_can_cuoc"])
         self._o("o_so_giay_to", f).fill(n.cccd or "")
         self._o("o_dia_chi", f).fill(n.dia_chi or "")
         nam = self._o("o_gioi_tinh", f)
@@ -162,6 +164,19 @@ class ChuyenQuyenPage(TiepNhanPage):
             self._dong_y_neu_trung_giay_to()
         expect(self._hien("modal_ca_nhan")).to_have_count(0)
         self._khong_co_hop("lưu người nhận")
+
+    def _chon_loai_giay_to(self, f: Locator, ten: str) -> None:
+        """Chọn theo đúng chữ trong danh sách (ô có thể bọc select2 nên đặt giá trị rồi báo change như người chọn)."""
+        o = self._el("sel_loai_giay_to", f).first
+        da_chon = o.evaluate("""(e, t) => {
+            const op = [...e.options].find(x => x.text.trim() === t);
+            if (!op) return null;
+            if (window.jQuery) jQuery(e).val(op.value).trigger('change');
+            else { e.value = op.value; e.dispatchEvent(new Event('change', { bubbles: true })); }
+            return e.options[e.selectedIndex].text.trim();
+        }""", ten)
+        if da_chon != ten:
+            raise RuntimeError(f"Không chọn được loại giấy tờ '{ten}' trên MPLIS")
 
     def _dong_y_neu_trung_giay_to(self) -> None:
         hop = self._hien("hop").filter(has_text="Giấy tờ tùy thân đã tồn tại")

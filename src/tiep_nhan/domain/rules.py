@@ -27,8 +27,9 @@ def _nguoi(v: dict, prefix: str, vai_tro: str, notes: list[tuple[str, str]]) -> 
         return None
     cccd, cccd_notes = to_cccd(v.get(f"{prefix}_cccd"), v.get(f"{prefix}_nam_sinh"))
     notes += [("BR-02", f"{vai_tro}: {n}") for n in cccd_notes]
+    can_cuoc = str(v.get(f"{prefix}_cccd") or "").strip().lower().startswith("cc:")
     n = Nguoi(vai_tro=vai_tro, ho_ten=v[f"{prefix}_ho_ten"], nam_sinh=v.get(f"{prefix}_nam_sinh"),
-              cccd=cccd, dia_chi=v.get(f"{prefix}_dia_chi"))
+              cccd=cccd, loai_giay_to="Căn cước" if can_cuoc else "CCCD", dia_chi=v.get(f"{prefix}_dia_chi"))
     if n.cccd:
         notes += [("BR-02", f"{vai_tro}: {x}") for x in cccd_khop(n.cccd, n.nam_sinh, vai_tro)]
     return n
