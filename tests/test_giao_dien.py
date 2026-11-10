@@ -267,5 +267,33 @@ def test_tuong_phan_chu_tren_nen_dat_wcag_aa(ten, chu, nen):
     assert tuong_phan(chu, nen) >= 4.5, f"{ten}: {tuong_phan(chu, nen):.2f}"
 
 
-def test_nap_duoc_font_trong_assets(qtbot):
-    assert {"Host Grotesk", "Instrument Sans"} <= set(G.nap_font())
+def test_font_be_vietnam_pro_du_chu_viet_va_duoc_dung_cho_tieu_de_lan_noi_dung(qtbot):
+    from pathlib import Path
+    from PySide6.QtGui import QFontInfo, QRawFont
+    from tiep_nhan.infra.config import assets_dir
+    assert "Be Vietnam Pro" in G.nap_font()
+    tep = sorted((assets_dir() / "fonts").glob("BeVietnamPro-*.ttf"))
+    assert [t.stem.split("-")[1] for t in tep] == ["Bold", "Medium", "Regular", "SemiBold"]
+    chu_viet = list(range(0x1EA0, 0x1EFA)) + [ord(c) for c in "ĐđƯưƠơĂăÂâÊêÔô"]
+    for t in tep:
+        raw = QRawFont(str(t.resolve()), 14)
+        assert all(raw.supportsCharacter(c) for c in chu_viet), t.name
+    assert QFontInfo(G._font(14)).family() == "Be Vietnam Pro"
+    assert QFontInfo(G._font_tieu_de(30)).family() == "Be Vietnam Pro"
+
+
+def test_bieu_tuong_app_co_du_co_va_dung_mau_chu_dao(qtbot):
+    ic = G.bieu_tuong_app()
+    co = sorted({s.width() for s in ic.availableSizes()})
+    assert co == [16, 24, 32, 48, 64, 128, 256]
+    anh = G.ve_logo(64, ti_le=1).toImage()
+    assert anh.width() == 64 and anh.pixelColor(32, 6).name().upper() == G.NUT_CHINH  # nền icon là màu nút chính
+
+
+def test_file_ico_dong_goi_co_du_7_co():
+    import struct
+    from tiep_nhan.infra.config import assets_dir
+    b = (assets_dir() / "icon" / "NhapPhieuMPLIS.ico").read_bytes()
+    _, kieu, so = struct.unpack("<HHH", b[:6])
+    co = sorted((b[6 + 16 * i] or 256) for i in range(so))
+    assert kieu == 1 and co == [16, 24, 32, 48, 64, 128, 256]

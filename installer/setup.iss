@@ -21,6 +21,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\NhapPhieuMPLIS.exe
+SetupIconFile=..\assets\icon\NhapPhieuMPLIS.ico
 
 [Tasks]
 Name: "desktopicon"; Description: "Tạo shortcut ngoài Desktop"; GroupDescription: "Shortcut:"

@@ -16,6 +16,7 @@ uv run pyinstaller --noconfirm --clean --onedir --windowed `
   --paths src `
   --add-data "config;config" `
   --add-data "assets;assets" `
+  --icon assets\icon\NhapPhieuMPLIS.ico `
   --collect-all playwright `
   --collect-submodules keyring.backends `
   run_app.py

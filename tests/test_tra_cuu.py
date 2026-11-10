@@ -163,3 +163,65 @@ def test_doc_het_trang_khi_khong_co_ket_qua():
 def test_doi_chieu_thua(ban_ghi, mong):
     from tiep_nhan.mplis.pages.tra_cuu import doi_chieu_thua
     assert doi_chieu_thua(ban_ghi, _hs()) == mong
+
+
+def test_chu_khop_quy_trinh_theo_lua_chon():
+    import tomllib
+    from tiep_nhan.mplis.pages.tiep_nhan import chu_khop_quy_trinh
+    from tiep_nhan.infra.config import resource_dir
+    cfg = tomllib.loads((resource_dir() / "locators.toml").read_text(encoding="utf-8"))["tiep_nhan"]
+    assert chu_khop_quy_trinh(cfg, "1") == "dưới 30 hồ sơ"
+    assert chu_khop_quy_trinh(cfg, "2") == "(từ 30 hồ"
+    with pytest.raises(ValueError):
+        chu_khop_quy_trinh(cfg, "3")
+
+
+def test_danh_sach_nguoi_xu_ly_theo_quy_trinh_dang_chon():
+    from tiep_nhan.mplis.ui_adapter import than_nguoi_xu_ly
+    assert than_nguoi_xu_ly("1")["schemaCode"] == "QD_1_012787_1"
+    assert than_nguoi_xu_ly("2")["schemaCode"] == "QD_1_012787_2" and than_nguoi_xu_ly("2")["forceReload"] is True
+
+
+def _adapter(chay_giao_dien: bool):
+    from tiep_nhan.domain.danh_muc import DanhMuc
+    from tiep_nhan.infra.config import Settings
+    from tiep_nhan.mplis.locators import Locators
+    from tiep_nhan.mplis.ui_adapter import PlaywrightMplis
+    from tiep_nhan.infra.config import resource_dir
+    m = PlaywrightMplis(Settings(chay_giao_dien=chay_giao_dien), Locators.doc(resource_dir() / "locators.toml"), DanhMuc({}))
+    goi = []
+
+    class TraCuuGia:
+        def tim(self, hs):
+            goi.append("ui_tim")
+            return "HS-UI"
+
+        def doc(self, hs, ma):
+            goi.append("ui_doc")
+            return {"so_to": "3"}
+
+    def api(*a, **k):
+        goi.append("api")
+        return []
+
+    m.tra_cuu = TraCuuGia()
+    m._tra_ho_so = api
+    m._goi_form = api
+    return m, goi
+
+
+def test_bat_chay_tren_giao_dien_thi_tra_cuu_qua_giao_dien_khong_goi_api():
+    from tiep_nhan.mplis.ui_adapter import KhongDungApi
+    m, goi = _adapter(True)
+    assert m.tim_trung(_hs()) == "HS-UI" and m.doc(_hs(), "HS-UI") == {"so_to": "3"}
+    for ham in (lambda: m.kiem_thua(_hs()), lambda: m.so_da_cap(["AA 12345678"]), m.ds_nguoi_xu_ly):
+        with pytest.raises(KhongDungApi):
+            ham()
+    assert goi == ["ui_tim", "ui_doc"]
+
+
+def test_tat_chay_tren_giao_dien_thi_tra_cuu_bang_api():
+    m, goi = _adapter(False)
+    m.dm = type("DM", (), {"anh_xa": lambda self, b, v: "12031"})()
+    m.tim_trung(_hs())
+    assert goi and goi[0] == "api" and "ui_tim" not in goi

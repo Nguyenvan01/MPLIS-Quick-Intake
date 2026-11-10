@@ -21,6 +21,7 @@ nut_tim          = { by = "css", value = "#btnTraCuuHoSoTiepNhan" }
 [tiep_nhan]
 duong_dan      = "/dc/TiepNhanHoSo"
 quy_trinh_tim  = "1.012787"
+quy_trinh_khop_don_le = "dưới 30 hồ sơ"   # QD_1_012787_1, chữ lấy từ danh sách quy trình MPLIS trả về
 quy_trinh_khop = "(từ 30 hồ"   # chữ trên MPLIS viết sai là "hồ sở" nên chỉ khớp phần đầu; về sau cho chọn trên giao diện
 buoc_chuyen    = "3. Thụ lý"
 lop_da_chon    = "selectUser"   # lớp MPLIS gắn vào dòng người xử lý đang chọn; bấm lại là bỏ chọn

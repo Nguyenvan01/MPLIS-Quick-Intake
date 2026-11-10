@@ -64,6 +64,8 @@ class Settings:
     nguoi_ky: str = "Phạm Ngọc Trường"
     ds_can_bo: list[str] = field(default_factory=lambda: ["ltmung.nnmt", "ndanh.tnmt"])  # combobox người xử lý
     thoi_han_mac_dinh: str = "Lâu dài"    # dùng khi Excel không có cột/ô Thời hạn
+    chay_giao_dien: bool = False          # True: mọi tra cứu qua giao diện MPLIS, không gọi API (tạo hồ sơ luôn qua giao diện)
+    quy_trinh: str = "2"                  # 1.012787: "1" đơn lẻ dưới 30 hồ sơ, "2" chủ đầu tư từ 30 hồ sơ trở lên
     danh_ba_can_bo: dict[str, str] = field(default_factory=dict)  # tài khoản -> họ tên người xử lý, tool tự lấy từ MPLIS
 
     @classmethod

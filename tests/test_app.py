@@ -478,3 +478,62 @@ def test_mo_lo_tu_lich_su_bo_danh_sach_chay_lai_cu(cua_so, mau, qtbot):
     m.bang.selectRow(0)
     m.mo(S.KET_QUA)
     assert w.phien.can_chay is None and w.phien.da_reset is False
+
+
+def test_mo_lai_lo_tu_lich_su_dung_che_do_gom_va_sheet_da_chay(cua_so, mau, qtbot):
+    from tiep_nhan.domain.gom_ho_so import CheDoGom
+    w = cua_so
+    m = w.man[S.LO_MOI]
+    m.mo_file(mau)
+    m.che_do.setCurrentIndex(m.che_do.findData(CheDoGom.THEO_MA_DAU_VAO))
+    m._sang_kiem_tra()
+    _du_so(w)
+    _het_loi(w)
+    _chay(w, qtbot)
+    sheet = w.phien.sheet
+    w.phien.che_do, w.phien.sheet = CheDoGom.MOI_DONG, None  # như lúc mở app lại
+    ls = w.man[S.LICH_SU]
+    w.di_toi(S.LICH_SU)
+    ls.bang.selectRow(0)
+    ls.mo(S.KET_QUA)
+    assert w.phien.che_do is CheDoGom.THEO_MA_DAU_VAO and w.phien.sheet == sheet  # chạy thử không ghi trạng thái nên không có kết quả để hiện lại
+
+
+def test_chon_quy_trinh_o_lo_moi_luu_vao_cai_dat(cua_so, mau):
+    w = cua_so
+    m = w.man[S.LO_MOI]
+    assert m.quy_trinh.currentData() == "2"  # mặc định như đã chốt: từ 30 hồ sơ trở lên
+    m.mo_file(mau)
+    m.quy_trinh.setCurrentIndex(m.quy_trinh.findData("1"))
+    m._sang_kiem_tra()
+    assert w.phien.settings.quy_trinh == "1"
+
+
+def test_tu_kiem_sau_khi_cai_ghi_ket_qua(cua_so, tmp_path, monkeypatch):
+    import json
+    from tiep_nhan.app import main_window as M
+    monkeypatch.setattr(M, "_mo_chromium_an", lambda: "ok")
+    ra = tmp_path / "kiem_cai.json"
+    kq = M.tu_kiem(cua_so, ra)
+    du_lieu = json.loads(ra.read_text(encoding="utf-8"))
+    assert kq is True and du_lieu["chromium"] == "ok" and du_lieu["phien_ban"] and du_lieu["font"] == "Be Vietnam Pro"
+
+
+def test_tu_kiem_bao_loi_khi_chromium_khong_chay(cua_so, tmp_path, monkeypatch):
+    import json
+    from tiep_nhan.app import main_window as M
+
+    def hong():
+        raise RuntimeError("không tìm thấy Chromium")
+
+    monkeypatch.setattr(M, "_mo_chromium_an", hong)
+    ra = tmp_path / "kiem_cai.json"
+    assert M.tu_kiem(cua_so, ra) is False
+    assert "không tìm thấy Chromium" in json.loads(ra.read_text(encoding="utf-8"))["chromium"]
+
+
+def test_cai_dat_tuy_chon_chay_tren_giao_dien(cua_so):
+    m = cua_so.man[S.CAI_DAT]
+    assert not m.tich["chay_giao_dien"].isChecked()  # mặc định dùng API để tra cứu
+    m.tich["chay_giao_dien"].setChecked(True)
+    assert Settings.load().chay_giao_dien is True

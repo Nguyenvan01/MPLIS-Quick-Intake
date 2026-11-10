@@ -55,18 +55,24 @@ class StateStore:
                    id INTEGER PRIMARY KEY AUTOINCREMENT, thoi_gian TEXT NOT NULL, file TEXT NOT NULL,
                    che_do TEXT NOT NULL, so_ho_so INTEGER NOT NULL, tom_tat TEXT NOT NULL, keys TEXT NOT NULL)"""
         )
+        cot_lo = [c[1] for c in self._db.execute("PRAGMA table_info(lo)")]
+        for cot in ("che_do_gom", "sheet"):  # file trạng thái bản cũ: thêm cột, lô cũ để trống
+            if cot not in cot_lo:
+                self._db.execute(f"ALTER TABLE lo ADD COLUMN {cot} TEXT NOT NULL DEFAULT ''")
         self._db.commit()
 
-    def ghi_lo(self, file: str, che_do: str, so_ho_so: int, tom_tat: str, keys: list[str]) -> None:
+    def ghi_lo(self, file: str, che_do: str, so_ho_so: int, tom_tat: str, keys: list[str], che_do_gom: str = "", sheet: str = "") -> None:
+        """che_do_gom, sheet: để mở lại lô từ Lịch sử ra đúng khóa hồ sơ như lúc chạy."""
         with self._lock:
-            self._db.execute("INSERT INTO lo(thoi_gian, file, che_do, so_ho_so, tom_tat, keys) VALUES (?,?,?,?,?,?)",
-                             (datetime.now().isoformat(timespec="seconds"), file, che_do, so_ho_so, tom_tat, json.dumps(keys)))
+            self._db.execute("INSERT INTO lo(thoi_gian, file, che_do, so_ho_so, tom_tat, keys, che_do_gom, sheet) VALUES (?,?,?,?,?,?,?,?)",
+                             (datetime.now().isoformat(timespec="seconds"), file, che_do, so_ho_so, tom_tat, json.dumps(keys), che_do_gom, sheet))
             self._db.commit()
 
     def ds_lo(self) -> list[dict]:
         with self._lock:
-            r = self._db.execute("SELECT id, thoi_gian, file, che_do, so_ho_so, tom_tat, keys FROM lo ORDER BY id DESC").fetchall()
-        return [dict(zip(("id", "thoi_gian", "file", "che_do", "so_ho_so", "tom_tat"), x[:6]), keys=json.loads(x[6])) for x in r]
+            r = self._db.execute("SELECT id, thoi_gian, file, che_do, so_ho_so, tom_tat, keys, che_do_gom, sheet FROM lo ORDER BY id DESC").fetchall()
+        return [dict(zip(("id", "thoi_gian", "file", "che_do", "so_ho_so", "tom_tat"), x[:6]), keys=json.loads(x[6]), che_do_gom=x[7], sheet=x[8])
+                for x in r]
 
     def xoa_lo(self, id_: int) -> None:
         """Chỉ xoá dòng lịch sử lô; trạng thái từng hồ sơ (bảng ho_so) giữ lại để không tạo trùng trên MPLIS."""

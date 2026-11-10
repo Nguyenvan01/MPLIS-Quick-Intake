@@ -31,8 +31,16 @@ def khop_dien_tich(tren_mplis: str, excel: float) -> bool:
     return so(float(tren_mplis.replace(",", "."))) == so(excel)
 
 
+def chu_khop_quy_trinh(cfg: dict, quy_trinh: str) -> str:
+    """Chữ để chọn đúng một quy trình 1.012787: "1" đơn lẻ dưới 30 hồ sơ, "2" chủ đầu tư từ 30 hồ sơ trở lên."""
+    if quy_trinh not in ("1", "2"):
+        raise ValueError(f"Quy trình không hợp lệ: {quy_trinh!r}")
+    return cfg["quy_trinh_khop_don_le"] if quy_trinh == "1" else cfg["quy_trinh_khop"]
+
+
 class TiepNhanPage(BasePage):
     P = "tiep_nhan"
+    quy_trinh = "2"  # PlaywrightMplis gán theo Cài đặt trước khi mở form
 
     def __init__(self, page, L, base_url: str):
         super().__init__(page, L)
@@ -92,7 +100,7 @@ class TiepNhanPage(BasePage):
             raise ValueError(f"Không tách được tên xã từ địa chỉ: {d.thua.dia_chi!r}")
         cfg = self.L.data[self.P]
         self._select2("select2_xa", xa, xa)
-        self._select2("select2_quy_trinh", cfg["quy_trinh_tim"], cfg["quy_trinh_khop"])
+        self._select2("select2_quy_trinh", cfg["quy_trinh_tim"], chu_khop_quy_trinh(cfg, self.quy_trinh))
         self._khong_co_hop("chọn quy trình")
         self._chon_thua(d)
         self._dat_dia_chi(d)

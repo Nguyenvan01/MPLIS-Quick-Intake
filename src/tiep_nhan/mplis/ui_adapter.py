@@ -46,7 +46,9 @@ JS_KIEM_SO = """async ([url, ds]) => {
 # Danh sách người nhận bước Thụ lý mà hộp "Chọn người xử lý" của MPLIS tải (lấy từ trace). forceReload=true vì có lúc
 # trả thiếu (33 thay vì 125 tài khoản). Quy trình QD_1_012787_2 là quy trình mặc định đã chốt trong plan.md.
 API_NGUOI_XU_LY = "/dc/DangKyAjax/GetUserInOuHasPermissionOnActivity"
-THAN_NGUOI_XU_LY = {"schemaCode": "QD_1_012787_2", "state": "ThuLyHoSo", "tinhId": 33, "xaId": 12031, "forceReload": True}
+def than_nguoi_xu_ly(quy_trinh: str) -> dict:
+    """Quy trình _1 và _2 có người nhận bước Thụ lý khác nhau (vd. ltmung.nnmt không nhận được ở _1)."""
+    return {"schemaCode": f"QD_1_012787_{quy_trinh}", "state": "ThuLyHoSo", "tinhId": 33, "xaId": 12031, "forceReload": True}
 
 
 JS_GOI_FORM = """async ([url, ts]) => {
@@ -56,6 +58,10 @@ JS_GOI_FORM = """async ([url, ts]) => {
         '__RequestVerificationToken': o ? o.value : ''}});
     return r.ok ? await r.json() : {success: false, status: r.status};
 }"""
+
+
+class KhongDungApi(RuntimeError):
+    """Người dùng bật "Chạy hoàn toàn trên giao diện": các bước chỉ làm được bằng API (quét trước, danh sách người xử lý) bỏ qua."""
 
 
 def _safe(s: str) -> str:
@@ -106,6 +112,10 @@ class PlaywrightMplis:
     def mo_ho_so(self, duong_dan: str) -> None:
         self.form.url_ho_so = duong_dan
 
+    def _can_api(self) -> None:
+        if self.settings.chay_giao_dien:
+            raise KhongDungApi("Đang bật Chạy hoàn toàn trên giao diện nên không gọi API")
+
     def _goi_form(self, duong_dan: str, tham_so: list[tuple[str, str]]) -> dict:
         if not da_dang_nhap(self.page.url, self.settings.mplis_url):
             self.cho_dang_nhap()
@@ -125,7 +135,9 @@ class PlaywrightMplis:
         return doc_het_trang(lambda s, n: self._goi_form(API_TRA_HO_SO, tham_so_tra_ho_so(xa, start=s, length=n, **loc)))
 
     def tim_trung(self, hs: HoSo) -> str | None:
-        """Tra trùng bằng API, đọc đủ mọi trang; API lỗi thì tra qua giao diện như trước."""
+        """Tra trùng bằng API, đọc đủ mọi trang; API lỗi hoặc người dùng chọn chạy trên giao diện thì tra qua giao diện."""
+        if self.settings.chay_giao_dien:
+            return self.tra_cuu.tim(hs)
         try:
             ds = self._tra_ho_so(hs, so_thua=str(hs.dau.thua.so_thua), so_to=str(hs.dau.thua.so_to))
         except Exception as e:  # noqa: BLE001
@@ -134,10 +146,12 @@ class PlaywrightMplis:
         return chon_trung(ds, hs)
 
     def kiem_thua(self, hs: HoSo) -> str | None:
+        self._can_api()
         xa, t = self._xa_id(hs), hs.dau.thua
         return doi_chieu_thua(doc_het_trang(lambda s, n: self._goi_form(API_TIM_THUA, tham_so_tim_thua(xa, str(t.so_thua), str(t.so_to), s, n))), hs)
 
     def so_da_cap(self, ds: list[str]) -> set[str]:
+        self._can_api()
         if not da_dang_nhap(self.page.url, self.settings.mplis_url):
             self.cho_dang_nhap()
         kq = self.page.evaluate(JS_KIEM_SO, [urljoin(self.settings.mplis_url, API_KIEM_SO), [dict(THAN_KIEM_SO, soPhatHanh=s) for s in ds]])
@@ -146,14 +160,16 @@ class PlaywrightMplis:
         return {s for s, x in zip(ds, kq) if x.get("isExistSoPhatHanh")}
 
     def ds_nguoi_xu_ly(self) -> dict[str, str]:
+        self._can_api()
         if not da_dang_nhap(self.page.url, self.settings.mplis_url):
             self.cho_dang_nhap()
-        kq = self.page.evaluate(JS_KIEM_SO, [urljoin(self.settings.mplis_url, API_NGUOI_XU_LY), [THAN_NGUOI_XU_LY]])[0]
+        kq = self.page.evaluate(JS_KIEM_SO, [urljoin(self.settings.mplis_url, API_NGUOI_XU_LY), [than_nguoi_xu_ly(self.settings.quy_trinh)]])[0]
         if not kq.get("success"):
             raise RuntimeError(f"MPLIS không trả danh sách người xử lý: {kq}")
         return {x["UserName"]: (x.get("FullName") or "").strip() for x in kq.get("value") or [] if x.get("UserName")}
 
     def mo_form(self) -> None:
+        self.form.quy_trinh = self.settings.quy_trinh
         self.form.mo()
 
     def dien(self, hs: HoSo) -> None:
@@ -185,6 +201,8 @@ class PlaywrightMplis:
         self.wizard.hoan_tat()
 
     def doc(self, hs: HoSo, ma_ho_so: str) -> dict[str, str]:
+        if self.settings.chay_giao_dien:
+            return self.tra_cuu.doc(hs, ma_ho_so)
         try:
             kq = self._tra_ho_so(hs, so_bien_nhan=ma_ho_so)
         except Exception as e:  # noqa: BLE001
