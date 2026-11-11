@@ -962,8 +962,10 @@ class _TheCheDo(The):
 
     def __init__(self, nut: QRadioButton, che_do: str, mo_ta: str):
         self.nut, self.cd = nut, CHE_DO[che_do]
-        nut.setStyleSheet(f"QRadioButton {{ color: {self.cd['chu']}; font-size: 18px; font-weight: 500; }}")
-        nut.setFocusPolicy(Qt.FocusPolicy.TabFocus)  # bấm chuột không hiện vòng focus; Tab vẫn hiện cho người dùng bàn phím
+        # không viền focus quanh nút (người dùng yêu cầu); viền thẻ đã cho biết đang chọn chế độ nào
+        nut.setStyleSheet(f"QRadioButton {{ color: {self.cd['chu']}; font-size: 18px; font-weight: 500; }}"
+                          "QRadioButton:focus { border-color: transparent; }")
+        nut.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         phu = _chu_phu(mo_ta, xuong_dong=True)
         phu.setIndent(32)
         super().__init__(nut, phu, dem=10)
