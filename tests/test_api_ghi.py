@@ -5,7 +5,7 @@ from tiep_nhan.domain.gom_ho_so import gom
 from tiep_nhan.domain.rules import kiem_tra_file
 from tiep_nhan.infra.excel_in import read_phieu
 from tiep_nhan.mplis.pages.tra_cuu import tham_so_tim_ca_nhan, tham_so_tim_gcn
-from tiep_nhan.mplis.api_ghi import (chon_ban_ghi_ca_nhan, chon_gcn_hien_hanh, kiem_phap_ly, chon_tai_khoan, doc_ket_qua_luu, doc_ngay_hen_tra, kiem_ngan_chan,
+from tiep_nhan.mplis.api_ghi import (chon_ban_ghi_ca_nhan, chon_gcn_hien_hanh, kiem_phap_ly, kiem_so_khac_gcn_cu, chon_tai_khoan, doc_ket_qua_luu, doc_ngay_hen_tra, kiem_ngan_chan,
                                      than_chuyen, than_luu, than_ngan_chan_thua, ten_quy_trinh)
 
 GUID = "d3022e23-3933-4d30-8182-bea1097ed8c9"
@@ -32,7 +32,7 @@ def test_than_luu_dung_cau_truc_ban_ghi(hs):
     assert h["thuaDat"] == [{"soThua": hs.dau.thua.so_thua, "soTo": hs.dau.thua.so_to, "dienTich": hs.dau.thua.dien_tich,
                              "diaChi": "địa chỉ thửa", "thuaDatId": 729983, "xaId": 12031}]
     assert h["listQuyTrinh"] == [{"TenQuyTrinh": "Tên quy trình", "MaQuyTrinh": "QD_1_012787_2", "TrangThai": 0, "IsStartFirst": True}]
-    assert h["diaChiTaiSan"] == hs.dau.thua.dia_chi
+    assert h["diaChiTaiSan"] == hs.dau.dia_chi_tai_san
     assert h["nguoiNopDon"]["hoTen"] == "A" and h["nguoiNopDon"]["vaiTroNguoiNopDon"] == "0"
     assert h["ngayhenTra"] == "2026-11-25T01:00:00.000Z"
 
@@ -144,3 +144,9 @@ def test_kiem_phap_ly():
     kiem_phap_ly({"daCongNhanPhapLy": True})
     with pytest.raises(RuntimeError, match="pháp lý"):
         kiem_phap_ly({"daCongNhanPhapLy": False})
+
+
+def test_so_phat_hanh_trung_gcn_cu_thi_dung():
+    kiem_so_khac_gcn_cu({"soPhatHanh": "AA 00000001"}, "AA 12345678")
+    with pytest.raises(RuntimeError, match="GCN cũ"):
+        kiem_so_khac_gcn_cu({"soPhatHanh": "AA 00000001"}, "aa00000001")

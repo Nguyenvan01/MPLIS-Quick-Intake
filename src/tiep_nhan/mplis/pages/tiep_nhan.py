@@ -145,8 +145,8 @@ class TiepNhanPage(BasePage):
             pass
         self._khong_co_hop("chọn thửa")
         o = self._el("o_dia_chi_ts")
-        o.fill(d.thua.dia_chi or "")
-        expect(o).to_have_value(d.thua.dia_chi or "")
+        o.fill(d.dia_chi_tai_san)
+        expect(o).to_have_value(d.dia_chi_tai_san)
 
     def _chon_nguoi_nop(self, n: Nguoi, tra_cuu: bool = True) -> None:
         if not (n.cccd and tra_cuu and self._tim_nguoi_nop(n)):

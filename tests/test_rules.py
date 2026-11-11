@@ -211,3 +211,30 @@ def test_so_tang_doc_tu_chu():
 def test_tien_to_cc_la_can_cuoc(raw, loai):
     dong, _ = _dong(ong_ho_ten="Người Nhận", ong_cccd=raw)
     assert dong.nguoi[0].cccd == "001063000001" and dong.nguoi[0].loai_giay_to == loai
+
+
+def test_dia_chi_thieu_tinh_thi_them_hung_yen():
+    from tiep_nhan.domain.models import ThuaDat
+    t = ThuaDat(so_to=3, so_thua=3547, dia_chi="AD18-17, Khu đô thị Đại An, Xã Nghĩa Trụ")
+    assert t.dia_chi == "AD18-17, Khu đô thị Đại An, Xã Nghĩa Trụ, tỉnh Hưng Yên"
+    assert t.dia_chi_thua_dat == "Xã Nghĩa Trụ, tỉnh Hưng Yên"
+    co_tinh = ThuaDat(so_to=1, so_thua=1, dia_chi="Lô A, xã Nghĩa Trụ, Tỉnh Hưng Yên")
+    assert co_tinh.dia_chi == "Lô A, xã Nghĩa Trụ, Tỉnh Hưng Yên"   # đã có tỉnh: giữ nguyên
+    huyen = ThuaDat(so_to=6, so_thua=1, dia_chi="CX18-132, KĐT Dream City, xã Long Hưng, huyện Văn Giang")
+    assert huyen.dia_chi.endswith("huyện Văn Giang, tỉnh Hưng Yên")
+    assert ThuaDat(so_to=1, so_thua=1, dia_chi="Số 5, Phường Mẫu, Hà Nội").dia_chi == "Số 5, Phường Mẫu, Hà Nội"  # không chắc thiếu tỉnh: giữ
+
+
+@pytest.mark.parametrize("to,thua", [("3 + 59", "3938 + 2162"), (3, "3938, 2162"), ("3;59", 3938)])
+def test_mot_dong_nhieu_thua_thi_chan(to, thua):
+    dong, vd = _dong(ong_ho_ten="Người Nhận", ong_cccd=NAM, so_to=to, so_thua=thua)
+    assert dong is None and any(v.muc == "loi" and "nhiều thửa" in v.noi_dung for v in vd)
+
+
+def test_dia_chi_tai_san_luon_co_ten_can():
+    co, _ = _dong(ong_ho_ten="Người Nhận", ong_cccd=NAM, dia_chi_thua="TĐ18-107, Khu đô thị đại An, xã Nghĩa Trụ, tỉnh Hưng Yên")
+    assert co.dia_chi_tai_san == "TĐ18-107, Khu đô thị đại An, xã Nghĩa Trụ, tỉnh Hưng Yên"
+    thieu, _ = kiem_tra_dong(RawRow(excel_row=6, values={"stt": 1, "ma_dau_vao": "AD9-80/VHOCP3/HĐMBNO", "so_to": 3, "so_thua": 3938,
+                                                          "ong_ho_ten": "Người Nhận", "ong_cccd": NAM,
+                                                          "dia_chi_thua": "Khu đô thị Đại An, xã Nghĩa Trụ, tỉnh Hưng Yên"}))
+    assert thieu.dia_chi_tai_san == "AD9-80, Khu đô thị Đại An, xã Nghĩa Trụ, tỉnh Hưng Yên"

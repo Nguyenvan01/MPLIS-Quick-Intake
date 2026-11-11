@@ -242,7 +242,7 @@ class ChuyenQuyenPage(TiepNhanPage):
         expect(o).to_have_value(re.compile(rf"^{re.escape(f'{d.nha.dt_san:g}')}"))
         if d.nha.so_tang:
             self._o("o_so_tang", m).fill(str(d.nha.so_tang))
-        self._dia_chi_chi_tiet(m, d.thua.dia_chi or "")  # địa chỉ tài sản đủ tên căn, như cột Đường
+        self._dia_chi_chi_tiet(m, d.dia_chi_tai_san)  # địa chỉ tài sản đủ tên căn
         self._el("nut_luu_nha", m).click()
         expect(self._hien("modal_tai_san")).to_have_count(0)
         self._khong_co_hop("lưu nhà")

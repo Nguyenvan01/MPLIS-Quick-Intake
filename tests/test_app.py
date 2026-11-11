@@ -563,5 +563,5 @@ def test_tai_file_mau(cua_so, tmp_path, monkeypatch):
     monkeypatch.setattr(S, "hop_thong_bao", lambda *a, **k: None)
     cua_so.man[S.LO_MOI].nut_mau.click()
     rows, van_de = kiem_tra_file(read_phieu(ra))
-    assert len(rows) == 2 and not [v for v in van_de if v.muc == "loi"]
+    assert len(rows) == 1 and not [v for v in van_de if v.muc == "loi"]
     assert all(r.thua.so_to == 999 for r in rows)  # tờ giả: không thể tạo hồ sơ thật từ file mẫu

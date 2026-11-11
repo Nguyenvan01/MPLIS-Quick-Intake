@@ -446,3 +446,9 @@ def test_ghi_chu_loi_khong_kem_ten_lop_loi(ho_so, store):
     Runner(ho_so[:1], FakeMplis(loi_chon_gcn={ho_so[0].key}), store, RunOptions(dry_run=False), on_event=lambda *a: ev.append(a)).run()
     loi = [a[2] for a in ev if a[1] == "Lỗi"]
     assert loi and loi[0].startswith("lỗi giả lập khi chọn GCN")
+
+
+def test_bao_buoc_dang_lam_len_giao_dien(ho_so, store):
+    ev = run(ho_so[:1], FakeMplis(), store)
+    buoc = [e[2] for e in ev if e[1] == "Đang chạy" and e[2]]
+    assert "Đang lưu hồ sơ…" in buoc and "Đang chuyển Thụ lý…" in buoc and buoc.index("Đang lưu hồ sơ…") < buoc.index("Đang chuyển Thụ lý…")

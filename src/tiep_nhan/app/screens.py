@@ -294,7 +294,7 @@ class ManLoMoi(ManHinh):
         self.nut_khac = NutPhu("Chọn file khác…")
         self.nut_khac.clicked.connect(self._chon)
         self.nut_mau = NutChu("Tải file mẫu")
-        self.nut_mau.setToolTip("File Excel đủ các cột tool đọc, kèm 2 dòng ví dụ và sheet hướng dẫn")
+        self.nut_mau.setToolTip("File Excel đủ các cột tool đọc, kèm 1 dòng ví dụ; rê chuột vào tên cột để xem ghi chú")
         self.nut_mau.clicked.connect(self._tai_mau)
         self.trang = QStackedWidget()
         self.trang.addWidget(self._trang_chua_co())
@@ -502,7 +502,7 @@ class ManLoMoi(ManHinh):
         except PermissionError:
             hop_thong_bao(self, "Không lưu được", "Hãy đóng file đó trong Excel rồi lưu lại.", "canh_bao")
             return
-        hop_thong_bao(self, "Đã lưu file mẫu", f"{f}\n\nĐiền dữ liệu thật thay 2 dòng ví dụ (tờ 999), rồi chọn file này ở màn Lô mới.")
+        hop_thong_bao(self, "Đã lưu file mẫu", f"{f}\n\nThay dòng ví dụ (tờ 999) bằng dữ liệu thật, mỗi hồ sơ một dòng, rồi chọn file này ở màn Lô mới.")
 
     def _chon(self) -> None:
         cu = QSettings("NhapPhieuMPLIS", "giao_dien")
@@ -962,8 +962,10 @@ class _TheCheDo(The):
 
     def __init__(self, nut: QRadioButton, che_do: str, mo_ta: str):
         self.nut, self.cd = nut, CHE_DO[che_do]
-        nut.setStyleSheet(f"QRadioButton {{ color: {self.cd['chu']}; font-size: 18px; font-weight: 500; }}")
-        nut.setFocusPolicy(Qt.FocusPolicy.TabFocus)  # bấm chuột không hiện vòng focus; Tab vẫn hiện cho người dùng bàn phím
+        # không viền focus quanh nút (người dùng yêu cầu); viền thẻ đã cho biết đang chọn chế độ nào
+        nut.setStyleSheet(f"QRadioButton {{ color: {self.cd['chu']}; font-size: 18px; font-weight: 500; }}"
+                          "QRadioButton:focus { border-color: transparent; }")
+        nut.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         phu = _chu_phu(mo_ta, xuong_dong=True)
         phu.setIndent(32)
         super().__init__(nut, phu, dem=10)
@@ -991,7 +993,7 @@ class ManChay(ManHinh):
         super().__init__(p, di_toi)
         self.worker: Worker | None = None
         self.hang: dict[str, int] = {}
-        self.dang = ""
+        self.dang, self.buoc = "", ""
         self.t_dau = 0.0
         self.r_thu, self.r_that = QRadioButton("Chạy thử"), QRadioButton("Chạy thật")
         self.r_thu.setChecked(True)
@@ -1169,7 +1171,7 @@ class ManChay(ManHinh):
         self.tien_do.setRange(0, len(ho_so))
         self.tien_do.setValue(0)
         self.nhat_ky.clear()
-        self.dang = ""
+        self.dang, self.buoc = "", ""
         opts = RunOptions(dry_run=not that, tai_khoan=p.settings.username,
                           tim_trung_truoc=p.settings.tim_trung_truoc or p.da_reset)  # đã reset thì buộc tra trùng
         self.che_do = "Chạy thật" if that else "Chạy thử"
@@ -1222,7 +1224,7 @@ class ManChay(ManHinh):
             return
         self._dat_dong(self.hang[k], k, st, ma, note)
         if st == "Đang chạy":
-            self.dang = k
+            self.dang, self.buoc = k, ngan
             self.bang.scrollToItem(self.bang.item(self.hang[k], 0))
         else:
             self.p.ket_qua[k] = (st, note, ma)
@@ -1240,14 +1242,15 @@ class ManChay(ManHinh):
         self.tren_so.setText(f"/ {tong} hồ sơ")
         if self.p.dang_chay:
             self.p.tien_do = (dang_lam, tong)
-            self.dang_chu.setText(f"Đang chạy: {ten_ho_so(self.dang)} · {self.p.nguoi_nhan(self.dang)}" if self.dang else "Đang mở trình duyệt…")
+            self.dang_chu.setText(f"Đang chạy: {ten_ho_so(self.dang)} · {self.p.nguoi_nhan(self.dang)}" + (f" — {self.buoc}" if self.buoc else "")
+                                  if self.dang else "Đang mở trình duyệt, vào MPLIS và quét trước cả lô…")
             self.dang_chu.setToolTip(self.dang_chu.text())
             phut = int((time.monotonic() - self.t_dau) / 60)
             if xong:
                 con = round((time.monotonic() - self.t_dau) / xong * (tong - xong) / 60)
                 self.uoc.setText(f"Đã chạy {phut} phút · còn khoảng {con} phút")
             else:
-                self.uoc.setText("Mỗi hồ sơ mất khoảng 3–4 phút")
+                self.uoc.setText("Mỗi hồ sơ mất khoảng 1,5–2 phút")
         _xoa_hang(self.hang_dem)
         dem = Counter(self.p.ket_qua[k][0] for k in self.hang if k in self.p.ket_qua)
         for st in dict.fromkeys(["Thành công", "Cần kiểm tra", "Lỗi", *dem]):

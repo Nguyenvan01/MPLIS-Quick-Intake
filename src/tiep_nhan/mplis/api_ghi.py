@@ -78,7 +78,7 @@ def than_luu(hs: HoSo, *, xa_id: int, thua: dict, nguoi_nop: dict, quy_trinh: tu
         "thuaDat": [{"soThua": t.so_thua, "soTo": t.so_to, "dienTich": thua.get("dienTich"), "diaChi": thua.get("diaChi") or "",
                      "thuaDatId": _ma_thua(thua), "xaId": xa_id}],
         "listQuyTrinh": [{"TenQuyTrinh": ten, "MaQuyTrinh": ma, "TrangThai": 0, "IsStartFirst": True}],
-        "nhanThongTin": "email", "tinhId": "33", "dangKyHoSoTrucTuyenId": "", "diaChiTaiSan": t.dia_chi or "",
+        "nhanThongTin": "email", "tinhId": "33", "dangKyHoSoTrucTuyenId": "", "diaChiTaiSan": hs.dau.dia_chi_tai_san,
     }, "capNhatSoBienNhanMoi": False, "thoiGianTiepNhanTheoHeThong": True}
 
 
@@ -145,6 +145,12 @@ def kiem_phap_ly(gcn: dict) -> None:
     """Wizard chuyển quyền bị MPLIS chặn ở Bước 1 nếu GCN cũ chưa có pháp lý: dừng trước khi Lưu."""
     if not gcn.get("daCongNhanPhapLy"):
         raise RuntimeError("GCN cũ của thửa chưa có pháp lý trên MPLIS: cập nhật pháp lý GCN rồi chạy lại")
+
+
+def kiem_so_khac_gcn_cu(gcn: dict, so_moi: str | None) -> None:
+    """Excel hay ghi nhầm số phát hành của GCN cũ (của chủ đầu tư) vào cột Mã phát hành: dừng trước khi Lưu."""
+    if so_moi and _chuan(re.sub(r"\s", "", str(gcn.get("soPhatHanh") or ""))) == _chuan(re.sub(r"\s", "", so_moi)):
+        raise RuntimeError(f"Mã phát hành {so_moi} trong Excel là số của GCN cũ của thửa: cần số phát hành GCN mới")
 
 
 def chon_tai_khoan(ds: dict[str, str], ten: str) -> str:

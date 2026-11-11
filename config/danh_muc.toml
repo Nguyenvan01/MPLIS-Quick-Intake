@@ -4,7 +4,7 @@
 # Bản người dùng sửa được đặt ở %APPDATA%\NhapPhieuMPLIS\danh_muc.toml (ưu tiên hơn file này).
 
 [loai_nha]
-"Liền kề" = "TODO"
+"Liền kề" = "Nhà ở liên kế"   # cùng loại với "Liên kế", chỉ khác cách viết
 "Liên kế" = "Nhà ở liên kế"
 "Biệt thự" = "Nhà biệt thự"
 

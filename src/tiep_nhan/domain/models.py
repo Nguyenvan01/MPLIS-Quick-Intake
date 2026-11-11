@@ -45,6 +45,8 @@ class ThuaDat(_Base):
     @field_validator("so_to", "so_thua", mode="before")
     @classmethod
     def _nguyen(cls, v):
+        if isinstance(v, str) and len(re.findall(r"\d+", v)) > 1:  # vd "3938 + 2162": đọc số đầu sẽ bỏ sót thửa
+            raise ValueError(f"'{v}' ghi nhiều thửa trong một dòng, tool chưa hỗ trợ: tách mỗi thửa một dòng hoặc làm tay")
         return to_int(v)
 
     @field_validator("dien_tich", mode="before")
@@ -63,7 +65,10 @@ class ThuaDat(_Base):
         """Cột Đường hay có đoạn trống (", ,") và khoảng trắng thừa: bỏ đi để GCN in gọn."""
         if v is None:
             return None
-        return ", ".join(p for p in (" ".join(x.split()) for x in str(v).split(",")) if p) or None
+        s = ", ".join(p for p in (" ".join(x.split()) for x in str(v).split(",")) if p)
+        if re.match(r"(?i)(xã|phường|thị trấn|thị xã|huyện)\s", s.rsplit(", ", 1)[-1]):
+            s += ", tỉnh Hưng Yên"  # dừng ở cấp xã/huyện là thiếu tỉnh; tool chỉ chạy MPLIS Hưng Yên (tinhId 33)
+        return s or None
 
     @property
     def dia_chi_thua_dat(self) -> str:
@@ -125,6 +130,14 @@ class DongPhieu(_Base):
         """(chồng, vợ) theo giới tính, không theo cột. BR-09 đã bảo đảm có một Nam, một Nữ."""
         a, b = self.nguoi
         return (a, b) if a.gioi_tinh == "Nam" else (b, a)
+
+    @property
+    def dia_chi_tai_san(self) -> str:
+        """Địa chỉ nhà trên GCN phải có tên căn; cột Đường không ghi thì thêm tên căn (từ Mã đầu vào) vào đầu."""
+        dc = self.thua.dia_chi or ""
+        if dc.split(",")[0].strip() == self.so_nha:
+            return dc
+        return ", ".join(x for x in (self.so_nha, dc) if x)
 
     @property
     def so_nha(self) -> str:
