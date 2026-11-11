@@ -32,7 +32,7 @@ def test_than_luu_dung_cau_truc_ban_ghi(hs):
     assert h["thuaDat"] == [{"soThua": hs.dau.thua.so_thua, "soTo": hs.dau.thua.so_to, "dienTich": hs.dau.thua.dien_tich,
                              "diaChi": "địa chỉ thửa", "thuaDatId": 729983, "xaId": 12031}]
     assert h["listQuyTrinh"] == [{"TenQuyTrinh": "Tên quy trình", "MaQuyTrinh": "QD_1_012787_2", "TrangThai": 0, "IsStartFirst": True}]
-    assert h["diaChiTaiSan"] == hs.dau.thua.dia_chi
+    assert h["diaChiTaiSan"] == hs.dau.dia_chi_tai_san
     assert h["nguoiNopDon"]["hoTen"] == "A" and h["nguoiNopDon"]["vaiTroNguoiNopDon"] == "0"
     assert h["ngayhenTra"] == "2026-11-25T01:00:00.000Z"
 

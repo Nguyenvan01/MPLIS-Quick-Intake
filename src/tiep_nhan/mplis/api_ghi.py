@@ -78,7 +78,7 @@ def than_luu(hs: HoSo, *, xa_id: int, thua: dict, nguoi_nop: dict, quy_trinh: tu
         "thuaDat": [{"soThua": t.so_thua, "soTo": t.so_to, "dienTich": thua.get("dienTich"), "diaChi": thua.get("diaChi") or "",
                      "thuaDatId": _ma_thua(thua), "xaId": xa_id}],
         "listQuyTrinh": [{"TenQuyTrinh": ten, "MaQuyTrinh": ma, "TrangThai": 0, "IsStartFirst": True}],
-        "nhanThongTin": "email", "tinhId": "33", "dangKyHoSoTrucTuyenId": "", "diaChiTaiSan": t.dia_chi or "",
+        "nhanThongTin": "email", "tinhId": "33", "dangKyHoSoTrucTuyenId": "", "diaChiTaiSan": hs.dau.dia_chi_tai_san,
     }, "capNhatSoBienNhanMoi": False, "thoiGianTiepNhanTheoHeThong": True}
 
 

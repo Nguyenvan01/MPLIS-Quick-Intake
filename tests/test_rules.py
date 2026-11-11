@@ -229,3 +229,12 @@ def test_dia_chi_thieu_tinh_thi_them_hung_yen():
 def test_mot_dong_nhieu_thua_thi_chan(to, thua):
     dong, vd = _dong(ong_ho_ten="Người Nhận", ong_cccd=NAM, so_to=to, so_thua=thua)
     assert dong is None and any(v.muc == "loi" and "nhiều thửa" in v.noi_dung for v in vd)
+
+
+def test_dia_chi_tai_san_luon_co_ten_can():
+    co, _ = _dong(ong_ho_ten="Người Nhận", ong_cccd=NAM, dia_chi_thua="TĐ18-107, Khu đô thị đại An, xã Nghĩa Trụ, tỉnh Hưng Yên")
+    assert co.dia_chi_tai_san == "TĐ18-107, Khu đô thị đại An, xã Nghĩa Trụ, tỉnh Hưng Yên"
+    thieu, _ = kiem_tra_dong(RawRow(excel_row=6, values={"stt": 1, "ma_dau_vao": "AD9-80/VHOCP3/HĐMBNO", "so_to": 3, "so_thua": 3938,
+                                                          "ong_ho_ten": "Người Nhận", "ong_cccd": NAM,
+                                                          "dia_chi_thua": "Khu đô thị Đại An, xã Nghĩa Trụ, tỉnh Hưng Yên"}))
+    assert thieu.dia_chi_tai_san == "AD9-80, Khu đô thị Đại An, xã Nghĩa Trụ, tỉnh Hưng Yên"

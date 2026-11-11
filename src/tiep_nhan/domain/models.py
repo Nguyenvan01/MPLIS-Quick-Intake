@@ -132,6 +132,14 @@ class DongPhieu(_Base):
         return (a, b) if a.gioi_tinh == "Nam" else (b, a)
 
     @property
+    def dia_chi_tai_san(self) -> str:
+        """Địa chỉ nhà trên GCN phải có tên căn; cột Đường không ghi thì thêm tên căn (từ Mã đầu vào) vào đầu."""
+        dc = self.thua.dia_chi or ""
+        if dc.split(",")[0].strip() == self.so_nha:
+            return dc
+        return ", ".join(x for x in (self.so_nha, dc) if x)
+
+    @property
     def so_nha(self) -> str:
         """Số nhà ở đầu địa chỉ (TĐ18-107, ...); địa chỉ không có số thì lấy mã căn từ Số hợp đồng."""
         dau = (self.thua.dia_chi or "").split(",")[0].strip()
