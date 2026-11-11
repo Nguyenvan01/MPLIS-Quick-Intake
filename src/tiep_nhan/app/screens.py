@@ -294,7 +294,7 @@ class ManLoMoi(ManHinh):
         self.nut_khac = NutPhu("Chọn file khác…")
         self.nut_khac.clicked.connect(self._chon)
         self.nut_mau = NutChu("Tải file mẫu")
-        self.nut_mau.setToolTip("File Excel đủ các cột tool đọc, kèm 2 dòng ví dụ và sheet hướng dẫn")
+        self.nut_mau.setToolTip("File Excel đủ các cột tool đọc, kèm 1 dòng ví dụ; rê chuột vào tên cột để xem ghi chú")
         self.nut_mau.clicked.connect(self._tai_mau)
         self.trang = QStackedWidget()
         self.trang.addWidget(self._trang_chua_co())
@@ -502,7 +502,7 @@ class ManLoMoi(ManHinh):
         except PermissionError:
             hop_thong_bao(self, "Không lưu được", "Hãy đóng file đó trong Excel rồi lưu lại.", "canh_bao")
             return
-        hop_thong_bao(self, "Đã lưu file mẫu", f"{f}\n\nĐiền dữ liệu thật thay 2 dòng ví dụ (tờ 999), rồi chọn file này ở màn Lô mới.")
+        hop_thong_bao(self, "Đã lưu file mẫu", f"{f}\n\nThay dòng ví dụ (tờ 999) bằng dữ liệu thật, mỗi hồ sơ một dòng, rồi chọn file này ở màn Lô mới.")
 
     def _chon(self) -> None:
         cu = QSettings("NhapPhieuMPLIS", "giao_dien")
