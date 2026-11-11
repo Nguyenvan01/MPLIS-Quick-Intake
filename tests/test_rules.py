@@ -211,3 +211,15 @@ def test_so_tang_doc_tu_chu():
 def test_tien_to_cc_la_can_cuoc(raw, loai):
     dong, _ = _dong(ong_ho_ten="Người Nhận", ong_cccd=raw)
     assert dong.nguoi[0].cccd == "001063000001" and dong.nguoi[0].loai_giay_to == loai
+
+
+def test_dia_chi_thieu_tinh_thi_them_hung_yen():
+    from tiep_nhan.domain.models import ThuaDat
+    t = ThuaDat(so_to=3, so_thua=3547, dia_chi="AD18-17, Khu đô thị Đại An, Xã Nghĩa Trụ")
+    assert t.dia_chi == "AD18-17, Khu đô thị Đại An, Xã Nghĩa Trụ, tỉnh Hưng Yên"
+    assert t.dia_chi_thua_dat == "Xã Nghĩa Trụ, tỉnh Hưng Yên"
+    co_tinh = ThuaDat(so_to=1, so_thua=1, dia_chi="Lô A, xã Nghĩa Trụ, Tỉnh Hưng Yên")
+    assert co_tinh.dia_chi == "Lô A, xã Nghĩa Trụ, Tỉnh Hưng Yên"   # đã có tỉnh: giữ nguyên
+    huyen = ThuaDat(so_to=6, so_thua=1, dia_chi="CX18-132, KĐT Dream City, xã Long Hưng, huyện Văn Giang")
+    assert huyen.dia_chi.endswith("huyện Văn Giang, tỉnh Hưng Yên")
+    assert ThuaDat(so_to=1, so_thua=1, dia_chi="Số 5, Phường Mẫu, Hà Nội").dia_chi == "Số 5, Phường Mẫu, Hà Nội"  # không chắc thiếu tỉnh: giữ

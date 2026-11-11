@@ -63,7 +63,10 @@ class ThuaDat(_Base):
         """Cột Đường hay có đoạn trống (", ,") và khoảng trắng thừa: bỏ đi để GCN in gọn."""
         if v is None:
             return None
-        return ", ".join(p for p in (" ".join(x.split()) for x in str(v).split(",")) if p) or None
+        s = ", ".join(p for p in (" ".join(x.split()) for x in str(v).split(",")) if p)
+        if re.match(r"(?i)(xã|phường|thị trấn|thị xã|huyện)\s", s.rsplit(", ", 1)[-1]):
+            s += ", tỉnh Hưng Yên"  # dừng ở cấp xã/huyện là thiếu tỉnh; tool chỉ chạy MPLIS Hưng Yên (tinhId 33)
+        return s or None
 
     @property
     def dia_chi_thua_dat(self) -> str:
