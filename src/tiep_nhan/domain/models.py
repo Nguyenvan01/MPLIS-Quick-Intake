@@ -45,6 +45,8 @@ class ThuaDat(_Base):
     @field_validator("so_to", "so_thua", mode="before")
     @classmethod
     def _nguyen(cls, v):
+        if isinstance(v, str) and len(re.findall(r"\d+", v)) > 1:  # vd "3938 + 2162": đọc số đầu sẽ bỏ sót thửa
+            raise ValueError(f"'{v}' ghi nhiều thửa trong một dòng, tool chưa hỗ trợ: tách mỗi thửa một dòng hoặc làm tay")
         return to_int(v)
 
     @field_validator("dien_tich", mode="before")

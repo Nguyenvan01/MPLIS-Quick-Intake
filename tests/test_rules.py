@@ -223,3 +223,9 @@ def test_dia_chi_thieu_tinh_thi_them_hung_yen():
     huyen = ThuaDat(so_to=6, so_thua=1, dia_chi="CX18-132, KĐT Dream City, xã Long Hưng, huyện Văn Giang")
     assert huyen.dia_chi.endswith("huyện Văn Giang, tỉnh Hưng Yên")
     assert ThuaDat(so_to=1, so_thua=1, dia_chi="Số 5, Phường Mẫu, Hà Nội").dia_chi == "Số 5, Phường Mẫu, Hà Nội"  # không chắc thiếu tỉnh: giữ
+
+
+@pytest.mark.parametrize("to,thua", [("3 + 59", "3938 + 2162"), (3, "3938, 2162"), ("3;59", 3938)])
+def test_mot_dong_nhieu_thua_thi_chan(to, thua):
+    dong, vd = _dong(ong_ho_ten="Người Nhận", ong_cccd=NAM, so_to=to, so_thua=thua)
+    assert dong is None and any(v.muc == "loi" and "nhiều thửa" in v.noi_dung for v in vd)
