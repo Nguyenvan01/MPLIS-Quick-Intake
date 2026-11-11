@@ -37,9 +37,14 @@ def _doi_so_phat_hanh(hs: HoSo, so: str) -> HoSo:
 class _DoGio:
     """Bọc port để cộng dồn thời gian các bước gọi lên MPLIS (task 3.5)."""
     BUOC = ("tim_trung", "mo_form", "dien", "luu", "chon_gcn", "chuyen_xu_ly", "dien_chuyen_quyen", "hoan_tat", "mo_du_thao", "luu_du_thao", "doc")
+    NHAN = {"tim_trung": "Đang tra trùng trên MPLIS…", "dien": "Đang kiểm tra trước khi lưu…", "luu": "Đang lưu hồ sơ…",
+            "chon_gcn": "Đang gắn GCN…", "chuyen_xu_ly": "Đang chuyển Thụ lý…", "dien_chuyen_quyen": "Đang điền wizard chuyển quyền…",
+            "hoan_tat": "Đang hoàn tất…", "mo_du_thao": "Đang mở Dự thảo GCN…", "luu_du_thao": "Đang tạo QR và lưu dự thảo…",
+            "doc": "Đang tra cứu lại để đối chiếu…"}
 
-    def __init__(self, port: MplisPort):
+    def __init__(self, port: MplisPort, bao: Callable[[str], None] = lambda _: None):
         self._port = port
+        self.bao = bao  # phần API chạy ngầm không hiện gì trên Chromium: báo bước để người dùng biết tool không đứng
         self.giay: dict[str, float] = {}
 
     def __getattr__(self, ten: str):
@@ -48,6 +53,8 @@ class _DoGio:
             return ham
 
         def do(*a, **k):
+            if ten in self.NHAN:
+                self.bao(self.NHAN[ten])
             dau = perf_counter()
             try:
                 return ham(*a, **k)
@@ -60,8 +67,9 @@ class Runner:
     def __init__(self, ho_so: list[HoSo], port: MplisPort, store: StateStore, opts: RunOptions,
                  on_event: EventFn | None = None, should_stop: Callable[[], bool] = lambda: False):
         self.ho_so, self.store, self.opts = list(ho_so), store, opts  # bản sao: quét số có thể thay hồ sơ bằng bản đã đổi số
-        self.port = _DoGio(port)
         self.emit = on_event or (lambda *a: None)
+        self._dang = ""  # key hồ sơ đang chạy, để báo bước đúng dòng
+        self.port = _DoGio(port, lambda nhan: self._dang and self.emit(self._dang, "Đang chạy", nhan, ""))
         self.should_stop = should_stop
 
     def run(self) -> None:
@@ -128,6 +136,7 @@ class Runner:
         self.ho_so = [hs for hs in self.ho_so if hs.key not in bo_qua]  # đã báo Cần kiểm tra, không báo thêm "Bỏ qua"
 
     def mot_ho_so(self, hs: HoSo) -> None:
+        self._dang = hs.key
         bg = self.store.get(hs.key)
         if bg.trang_thai.ket_thuc:
             self.emit(hs.key, "Bỏ qua", "Đã xong ở lần chạy trước", bg.ma_ho_so)

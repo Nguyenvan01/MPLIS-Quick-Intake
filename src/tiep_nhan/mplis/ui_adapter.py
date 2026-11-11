@@ -78,6 +78,10 @@ class PlaywrightMplis:
         self.ghi_api = False    # Worker bật khi chạy thật: Lưu, gắn GCN, chuyển Thụ lý gọi thẳng API (Đợt 1)
         self._cho_luu: dict | None = None
         self._da_luu: G.KetQuaLuu | None = None
+        # nhớ trong một lượt chạy để không hỏi MPLIS lặp lại (mỗi lệnh 1–4 giây)
+        self._ds_nxl: dict[str, str] | None = None
+        self._thua: dict[str, list] = {}       # key hồ sơ -> kết quả tra thửa của bước quét trước
+        self._ten_qt: dict[str, str] = {}
 
     def __enter__(self) -> "PlaywrightMplis":
         if getattr(sys, "frozen", False):  # bản đóng gói mang Chromium theo trong thư mục cài
@@ -162,7 +166,8 @@ class PlaywrightMplis:
         if len(hs.dong) != 1:
             raise NotImplementedError("Chưa xác minh luồng gộp nhiều dòng vào một hồ sơ")
         d, xa = hs.dau, self._xa_id(hs)
-        ds = doc_het_trang(lambda s, n: self._goi_form(API_TIM_THUA, tham_so_tim_thua(xa, str(d.thua.so_thua), str(d.thua.so_to), s, n)))
+        ds = self._thua.pop(hs.key, None) or doc_het_trang(
+            lambda s, n: self._goi_form(API_TIM_THUA, tham_so_tim_thua(xa, str(d.thua.so_thua), str(d.thua.so_to), s, n)))
         lech = doi_chieu_thua(ds, hs)
         if lech:
             raise RuntimeError(lech)
@@ -180,8 +185,13 @@ class PlaywrightMplis:
         ma = f"QD_1_012787_{self.settings.quy_trinh}"
         bay_gio = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:00.000Z")
         return G.than_luu(hs, xa_id=xa, thua=thua[0], nguoi_nop=nguoi,
-                          quy_trinh=(ma, G.ten_quy_trinh(self._goi_json(G.API_QUY_TRINH, {}), ma)), ngay_tiep_nhan=bay_gio,
+                          quy_trinh=(ma, self._ten_quy_trinh(ma)), ngay_tiep_nhan=bay_gio,
                           ngay_hen_tra=G.doc_ngay_hen_tra(self._goi_json(G.API_NGAY_HEN_TRA, {"ngayTiepNhan": bay_gio, "schemaCode": [ma]})))
+
+    def _ten_quy_trinh(self, ma: str) -> str:
+        if ma not in self._ten_qt:
+            self._ten_qt[ma] = G.ten_quy_trinh(self._goi_json(G.API_QUY_TRINH, {}), ma)
+        return self._ten_qt[ma]
 
     def _xa_id(self, hs: HoSo) -> int:
         v = self.dm.anh_xa("xa", ten_xa(hs.dau.thua.dia_chi))
@@ -207,7 +217,8 @@ class PlaywrightMplis:
     def kiem_thua(self, hs: HoSo) -> str | None:
         self._can_api()
         xa, t = self._xa_id(hs), hs.dau.thua
-        return doi_chieu_thua(doc_het_trang(lambda s, n: self._goi_form(API_TIM_THUA, tham_so_tim_thua(xa, str(t.so_thua), str(t.so_to), s, n))), hs)
+        ds = self._thua[hs.key] = doc_het_trang(lambda s, n: self._goi_form(API_TIM_THUA, tham_so_tim_thua(xa, str(t.so_thua), str(t.so_to), s, n)))
+        return doi_chieu_thua(ds, hs)
 
     def so_da_cap(self, ds: list[str]) -> set[str]:
         self._can_api()
@@ -222,10 +233,12 @@ class PlaywrightMplis:
         self._can_api()
         if not da_dang_nhap(self.page.url, self.settings.mplis_url):
             self.cho_dang_nhap()
-        kq = self.page.evaluate(JS_KIEM_SO, [urljoin(self.settings.mplis_url, API_NGUOI_XU_LY), [than_nguoi_xu_ly(self.settings.quy_trinh)]])[0]
-        if not kq.get("success"):
-            raise RuntimeError(f"MPLIS không trả danh sách người xử lý: {kq}")
-        return {x["UserName"]: (x.get("FullName") or "").strip() for x in kq.get("value") or [] if x.get("UserName")}
+        if self._ds_nxl is None:
+            kq = self.page.evaluate(JS_KIEM_SO, [urljoin(self.settings.mplis_url, API_NGUOI_XU_LY), [than_nguoi_xu_ly(self.settings.quy_trinh)]])[0]
+            if not kq.get("success"):
+                raise RuntimeError(f"MPLIS không trả danh sách người xử lý: {kq}")
+            self._ds_nxl = {x["UserName"]: (x.get("FullName") or "").strip() for x in kq.get("value") or [] if x.get("UserName")}
+        return self._ds_nxl
 
     def mo_form(self) -> None:
         self._cho_luu = None

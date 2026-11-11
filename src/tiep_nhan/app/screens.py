@@ -993,7 +993,7 @@ class ManChay(ManHinh):
         super().__init__(p, di_toi)
         self.worker: Worker | None = None
         self.hang: dict[str, int] = {}
-        self.dang = ""
+        self.dang, self.buoc = "", ""
         self.t_dau = 0.0
         self.r_thu, self.r_that = QRadioButton("Chạy thử"), QRadioButton("Chạy thật")
         self.r_thu.setChecked(True)
@@ -1171,7 +1171,7 @@ class ManChay(ManHinh):
         self.tien_do.setRange(0, len(ho_so))
         self.tien_do.setValue(0)
         self.nhat_ky.clear()
-        self.dang = ""
+        self.dang, self.buoc = "", ""
         opts = RunOptions(dry_run=not that, tai_khoan=p.settings.username,
                           tim_trung_truoc=p.settings.tim_trung_truoc or p.da_reset)  # đã reset thì buộc tra trùng
         self.che_do = "Chạy thật" if that else "Chạy thử"
@@ -1224,7 +1224,7 @@ class ManChay(ManHinh):
             return
         self._dat_dong(self.hang[k], k, st, ma, note)
         if st == "Đang chạy":
-            self.dang = k
+            self.dang, self.buoc = k, ngan
             self.bang.scrollToItem(self.bang.item(self.hang[k], 0))
         else:
             self.p.ket_qua[k] = (st, note, ma)
@@ -1242,14 +1242,15 @@ class ManChay(ManHinh):
         self.tren_so.setText(f"/ {tong} hồ sơ")
         if self.p.dang_chay:
             self.p.tien_do = (dang_lam, tong)
-            self.dang_chu.setText(f"Đang chạy: {ten_ho_so(self.dang)} · {self.p.nguoi_nhan(self.dang)}" if self.dang else "Đang mở trình duyệt…")
+            self.dang_chu.setText(f"Đang chạy: {ten_ho_so(self.dang)} · {self.p.nguoi_nhan(self.dang)}" + (f" — {self.buoc}" if self.buoc else "")
+                                  if self.dang else "Đang mở trình duyệt, vào MPLIS và quét trước cả lô…")
             self.dang_chu.setToolTip(self.dang_chu.text())
             phut = int((time.monotonic() - self.t_dau) / 60)
             if xong:
                 con = round((time.monotonic() - self.t_dau) / xong * (tong - xong) / 60)
                 self.uoc.setText(f"Đã chạy {phut} phút · còn khoảng {con} phút")
             else:
-                self.uoc.setText("Mỗi hồ sơ mất khoảng 3–4 phút")
+                self.uoc.setText("Mỗi hồ sơ mất khoảng 1,5–2 phút")
         _xoa_hang(self.hang_dem)
         dem = Counter(self.p.ket_qua[k][0] for k in self.hang if k in self.p.ket_qua)
         for st in dict.fromkeys(["Thành công", "Cần kiểm tra", "Lỗi", *dem]):
