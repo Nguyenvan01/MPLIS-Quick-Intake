@@ -175,7 +175,9 @@ class PlaywrightMplis:
         if len(thua) != 1:
             raise RuntimeError(f"MPLIS có {len(thua)} thửa {d.thua.so_to}/{d.thua.so_thua}")
         G.kiem_ngan_chan(self._goi_json(G.API_NGAN_CHAN_THUA, G.than_ngan_chan_thua(thua[0], xa)), "chọn thửa")
-        G.kiem_phap_ly(self._gcn_cua_thua(hs))  # GCN chưa có pháp lý thì wizard bị chặn ở Bước 1: dừng trước khi tạo hồ sơ
+        gcn_cu = self._gcn_cua_thua(hs)
+        G.kiem_phap_ly(gcn_cu)  # GCN chưa có pháp lý thì wizard bị chặn ở Bước 1: dừng trước khi tạo hồ sơ
+        G.kiem_so_khac_gcn_cu(gcn_cu, d.thua.ma_phat_hanh)
         n = d.nguoi_nop
         nguoi = {"hoTen": n.ho_ten, "giayChungMinh": n.cccd or "", "diachi": n.dia_chi or ""}
         if n.cccd and not d.nguoi_nop_excel:  # có cột Người nộp thì gõ thẳng như giao diện (BR-09)

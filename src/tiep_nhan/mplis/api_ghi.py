@@ -147,6 +147,12 @@ def kiem_phap_ly(gcn: dict) -> None:
         raise RuntimeError("GCN cũ của thửa chưa có pháp lý trên MPLIS: cập nhật pháp lý GCN rồi chạy lại")
 
 
+def kiem_so_khac_gcn_cu(gcn: dict, so_moi: str | None) -> None:
+    """Excel hay ghi nhầm số phát hành của GCN cũ (của chủ đầu tư) vào cột Mã phát hành: dừng trước khi Lưu."""
+    if so_moi and _chuan(re.sub(r"\s", "", str(gcn.get("soPhatHanh") or ""))) == _chuan(re.sub(r"\s", "", so_moi)):
+        raise RuntimeError(f"Mã phát hành {so_moi} trong Excel là số của GCN cũ của thửa: cần số phát hành GCN mới")
+
+
 def chon_tai_khoan(ds: dict[str, str], ten: str) -> str:
     """Cán bộ XL trong Excel là tài khoản hoặc đuôi họ tên; phải khớp đúng một người nhận bước Thụ lý."""
     khop = [tk for tk, ho_ten in ds.items() if tk.strip() == ten.strip() or _chuan(ho_ten).endswith(_chuan(ten))]
