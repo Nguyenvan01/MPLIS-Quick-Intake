@@ -29,6 +29,12 @@ def chon_ca_nhan(dong: list[list[str]], n: Nguoi) -> int | None:
     return None
 
 
+def khop_ten_xa(xa: str) -> re.Pattern:
+    """Khớp tên chính trước ngoặc: "Phường Mỹ Hào (phường Bần Yên Nhân - thị xã Mỹ Hào cũ)" khớp "Mỹ Hào",
+    còn "xã Cẩm Xá (thị xã Mỹ Hào cũ)" thì không (danh sách MPLIS sau sáp nhập ghi tên cũ trong ngoặc)."""
+    return re.compile(rf"^\s*(xã|phường|thị trấn|tt)\s+{re.escape(xa.strip())}\s*(\(|$)", re.IGNORECASE)
+
+
 def khop_dien_tich(tren_mplis: str, excel: float) -> bool:
     """Bảng thửa của MPLIS ghi số thập phân bằng dấu chấm, Excel đã đọc thành số."""
     return so(float(tren_mplis.replace(",", "."))) == so(excel)
@@ -64,7 +70,7 @@ class TiepNhanPage(BasePage):
         if hop.count():
             raise RuntimeError(f"MPLIS thông báo ở bước {buoc}: {' '.join(hop.first.inner_text().split())[:200]}")
 
-    def _select2(self, o: str, tim: str, khop: str) -> None:
+    def _select2(self, o: str, tim: str, khop: str | re.Pattern) -> None:
         self._el(o).click()
         self._el("select2_tim").fill(tim)
         lua_chon = self._el("select2_lua_chon").filter(has_text=khop)
@@ -102,7 +108,7 @@ class TiepNhanPage(BasePage):
         if not xa:
             raise ValueError(f"Không tách được tên xã từ địa chỉ: {d.thua.dia_chi!r}")
         cfg = self.L.data[self.P]
-        self._select2("select2_xa", xa, xa)
+        self._select2("select2_xa", xa, khop_ten_xa(xa))
         self._select2("select2_quy_trinh", cfg["quy_trinh_tim"], chu_khop_quy_trinh(cfg, self.quy_trinh))
         self._khong_co_hop("chọn quy trình")
         self._chon_thua(d)

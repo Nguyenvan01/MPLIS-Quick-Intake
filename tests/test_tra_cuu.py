@@ -4,7 +4,7 @@ import pytest
 from tiep_nhan.domain.models import HoSo, Nguoi
 from tiep_nhan.domain.rules import kiem_tra_dong
 from tiep_nhan.infra.excel_in import RawRow
-from tiep_nhan.mplis.pages.tiep_nhan import chon_ca_nhan, khop_can_bo
+from tiep_nhan.mplis.pages.tiep_nhan import chon_ca_nhan, khop_can_bo, khop_ten_xa
 from tiep_nhan.mplis.pages.tra_cuu import chon_trung, gia_tri_doc
 from tiep_nhan.mplis.port import so_sanh
 
@@ -230,3 +230,17 @@ def test_tat_chay_tren_giao_dien_thi_tra_cuu_bang_api():
     m.dm = type("DM", (), {"anh_xa": lambda self, b, v: "12031"})()
     m.tim_trung(_hs())
     assert goi and goi[0] == "api" and "ui_tim" not in goi
+
+
+MY_HAO = ["Phường Đường Hào (xã Xuân Dục - thị xã Mỹ Hào cũ)", "Phường Mỹ Hào (phường Bần Yên Nhân - thị xã Mỹ Hào cũ)",
+          "phường Bạch Sam (thị xã Mỹ Hào cũ)", "xã Cẩm Xá (thị xã Mỹ Hào cũ)", "xã Ngọc Lâm (thị xã Mỹ Hào cũ)",
+          "xã Nghĩa Trụ (huyện Văn Giang cũ)", "TT Như Quỳnh (huyện Văn Lâm cũ)", "Xã Ngọc Lâm (xã Quỳnh Ngọc - huyện Quỳnh Phụ cũ)"]
+
+
+@pytest.mark.parametrize("xa, dung", [("Mỹ Hào", ["Phường Mỹ Hào (phường Bần Yên Nhân - thị xã Mỹ Hào cũ)"]),
+                                      ("Nghĩa Trụ", ["xã Nghĩa Trụ (huyện Văn Giang cũ)"]),
+                                      ("Như Quỳnh", ["TT Như Quỳnh (huyện Văn Lâm cũ)"]),
+                                      ("Ngọc Lâm", ["xã Ngọc Lâm (thị xã Mỹ Hào cũ)", "Xã Ngọc Lâm (xã Quỳnh Ngọc - huyện Quỳnh Phụ cũ)"])])
+def test_khop_ten_xa_theo_ten_chinh_truoc_ngoac(xa, dung):
+    # tên cũ trong ngoặc (vd "thị xã Mỹ Hào cũ") không được tính; trùng tên thật thì vẫn ra nhiều để tool dừng hỏi
+    assert [t for t in MY_HAO if khop_ten_xa(xa).search(t)] == dung
