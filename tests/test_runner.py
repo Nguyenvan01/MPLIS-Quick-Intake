@@ -452,3 +452,16 @@ def test_bao_buoc_dang_lam_len_giao_dien(ho_so, store):
     ev = run(ho_so[:1], FakeMplis(), store)
     buoc = [e[2] for e in ev if e[1] == "Đang chạy" and e[2]]
     assert "Đang lưu hồ sơ…" in buoc and "Đang chuyển Thụ lý…" in buoc and buoc.index("Đang lưu hồ sơ…") < buoc.index("Đang chuyển Thụ lý…")
+
+
+def test_bo_qua_can_kiem_tra_hien_ly_do_goc(ho_so, store):
+    store.mark(ho_so[0].key, TrangThai.CAN_KIEM_TRA, 'Cần kiểm tra lại số phát hành "AA 1"')
+    ev = run(ho_so[:1], FakeMplis(), store)
+    note = next(e[2] for e in ev if e[1] == "Bỏ qua")
+    assert 'số phát hành "AA 1"' in note and "Chạy lại" in note
+
+
+def test_bo_qua_can_kiem_tra_da_co_ma_thi_chi_xu_ly_tren_mplis(ho_so, store):
+    store.mark(ho_so[0].key, TrangThai.CAN_KIEM_TRA, "Wizard dở", "120311")
+    note = next(e[2] for e in run(ho_so[:1], FakeMplis(), store) if e[1] == "Bỏ qua")
+    assert "Wizard dở" in note and "120311" in note and "Chạy lại" not in note

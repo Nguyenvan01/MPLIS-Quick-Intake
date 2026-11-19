@@ -142,7 +142,10 @@ class Runner:
             self.emit(hs.key, "Bỏ qua", "Đã xong ở lần chạy trước", bg.ma_ho_so)
             return
         if bg.trang_thai is TrangThai.CAN_KIEM_TRA:
-            self.emit(hs.key, "Bỏ qua", "Cần người kiểm tra (bấm Chạy lại để làm lại)", bg.ma_ho_so)
+            ly_do = f": {bg.ghi_chu}" if bg.ghi_chu else ""
+            # có mã thì nút Chạy lại không làm lại được (tra trùng gặp chính nó): chỉ đúng việc cần làm
+            viec = f"Hồ sơ đã có trên MPLIS ({bg.ma_ho_so}): xử lý tiếp trên MPLIS" if bg.ma_ho_so else "Bấm Chạy lại để làm lại"
+            self.emit(hs.key, "Bỏ qua", f"Cần người kiểm tra{ly_do}. {viec}", bg.ma_ho_so)
             return
         if bg.trang_thai is TrangThai.LOI and not self.opts.chay_lai_loi:
             self.emit(hs.key, "Bỏ qua", "Lỗi lần trước", "")
